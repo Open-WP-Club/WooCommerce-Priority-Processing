@@ -1,0 +1,24 @@
+/* WooCommerce Priority Processing Admin Styles */
+
+.wrap h1 {
+  margin-bottom: 20px;
+}
+
+.form-table th {
+  width: 200px;
+}
+
+.form-table input[type="text"],
+.form-table input[type="number"] {
+  width: 300px;
+}
+
+.form-table textarea {
+  width: 100%;
+  max-width: 500px;
+}
+
+.form-table .description {
+  font-style: italic;
+  color: #666;
+}
