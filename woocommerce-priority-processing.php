@@ -14,13 +14,6 @@
  * WC tested up to: 8.5
  */
 
-// Declare HPOS compatibility
-add_action('before_woocommerce_init', function () {
-  if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
-    \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
-  }
-});
-
 // Prevent direct access
 if (!defined('ABSPATH')) {
   exit;
@@ -30,6 +23,13 @@ if (!defined('ABSPATH')) {
 define('WPP_VERSION', '1.0.0');
 define('WPP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPP_PLUGIN_URL', plugin_dir_url(__FILE__));
+
+// Declare HPOS compatibility
+add_action('before_woocommerce_init', function () {
+  if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+    \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+  }
+});
 
 class WooCommerce_Priority_Processing
 {
@@ -64,10 +64,15 @@ class WooCommerce_Priority_Processing
     add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
 
     // Frontend hooks
-    add_action('woocommerce_review_order_before_submit', [$this, 'add_priority_checkbox']);
+    add_action('woocommerce_review_order_after_cart_contents', [$this, 'add_priority_checkbox']);
+    add_action('woocommerce_checkout_before_order_review', [$this, 'add_priority_checkbox_fallback']);
     add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
     add_action('wp_ajax_wpp_update_priority', [$this, 'ajax_update_priority']);
     add_action('wp_ajax_nopriv_wpp_update_priority', [$this, 'ajax_update_priority']);
+
+    // Block-based checkout support
+    add_action('woocommerce_blocks_checkout_block_registration', [$this, 'register_checkout_block']);
+    add_action('woocommerce_store_api_checkout_update_order_from_request', [$this, 'update_order_from_block_checkout'], 10, 2);
 
     // Cart and checkout hooks
     add_action('woocommerce_cart_calculate_fees', [$this, 'add_priority_fee']);
@@ -214,25 +219,141 @@ class WooCommerce_Priority_Processing
     $fee_amount = get_option('wpp_fee_amount', '5.00');
     $checkbox_label = get_option('wpp_checkbox_label');
     $description = get_option('wpp_description');
-    $is_checked = WC()->session->get('priority_processing', false);
+
+    if (WC()->session && !WC()->session->has_session()) {
+      WC()->session->set_customer_session_cookie(true);
+    }
+
+    $is_checked = WC()->session ? WC()->session->get('priority_processing', false) : false;
 
   ?>
-    <div id="wpp-priority-option" style="margin: 20px 0; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
-      <p style="margin: 0;">
-        <label style="font-weight: normal;">
-          <input type="checkbox" id="wpp_priority_checkbox" name="priority_processing" value="1"
-            <?php checked($is_checked); ?> />
+    <tr class="wpp-priority-row">
+      <td colspan="2" style="padding: 10px;">
+        <div id="wpp-priority-option" style="background: #f7f7f7; padding: 12px; border-radius: 4px;">
+          <label style="display: flex; align-items: flex-start; cursor: pointer;">
+            <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox" name="priority_processing" value="1"
+              <?php checked($is_checked); ?> style="margin-right: 8px; margin-top: 2px;" />
+            <span>
+              <strong><?php echo esc_html($checkbox_label); ?>:
+                <?php echo wc_price($fee_amount); ?></strong>
+              <?php if ($description): ?>
+                <br><small style="color: #666; display: block; margin-top: 4px;">
+                  <?php echo esc_html($description); ?>
+                </small>
+              <?php endif; ?>
+            </span>
+          </label>
+        </div>
+      </td>
+    </tr>
+  <?php
+  }
+
+  public function add_priority_checkbox_fallback()
+  {
+    if (get_option('wpp_enabled') !== '1') {
+      return;
+    }
+
+    $fee_amount = get_option('wpp_fee_amount', '5.00');
+    $checkbox_label = get_option('wpp_checkbox_label');
+    $description = get_option('wpp_description');
+
+    if (WC()->session && !WC()->session->has_session()) {
+      WC()->session->set_customer_session_cookie(true);
+    }
+
+    $is_checked = WC()->session ? WC()->session->get('priority_processing', false) : false;
+
+  ?>
+    <div id="wpp-priority-option-fallback" style="margin: 20px 0; padding: 15px; background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 4px;">
+      <label style="display: flex; align-items: flex-start; cursor: pointer;">
+        <input type="checkbox" id="wpp_priority_checkbox_fallback" class="wpp-priority-checkbox" name="priority_processing" value="1"
+          <?php checked($is_checked); ?> style="margin-right: 8px; margin-top: 2px;" />
+        <span>
           <strong><?php echo esc_html($checkbox_label); ?>:
             <?php echo wc_price($fee_amount); ?></strong>
           <?php if ($description): ?>
-            <br><small style="color: #666; margin-left: 24px; display: inline-block; margin-top: 5px;">
+            <br><small style="color: #666; display: block; margin-top: 4px;">
               <?php echo esc_html($description); ?>
             </small>
           <?php endif; ?>
-        </label>
-      </p>
+        </span>
+      </label>
     </div>
+    <script>
+      jQuery(function($) {
+        // Remove duplicate if table version exists
+        if ($('#wpp-priority-option').length > 0) {
+          $('#wpp-priority-option-fallback').remove();
+        }
+      });
+    </script>
     <?php
+  }
+
+  public function register_checkout_block()
+  {
+    // For block-based checkout, we need to inject via JavaScript
+    add_action('wp_footer', function () {
+      if (!is_checkout() || get_option('wpp_enabled') !== '1') {
+        return;
+      }
+
+      $fee_amount = get_option('wpp_fee_amount', '5.00');
+      $checkbox_label = get_option('wpp_checkbox_label');
+      $description = get_option('wpp_description');
+      $is_checked = WC()->session ? WC()->session->get('priority_processing', false) : false;
+    ?>
+      <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          // Wait for checkout to be ready
+          setTimeout(function() {
+            var checkoutForm = document.querySelector('.wc-block-checkout__form');
+            var orderSummary = document.querySelector('.wc-block-components-order-summary');
+
+            if (checkoutForm && !document.getElementById('wpp-block-priority-option')) {
+              var priorityHtml = `
+                            <div id="wpp-block-priority-option" style="margin: 20px; padding: 15px; background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 4px;">
+                                <label style="display: flex; align-items: flex-start; cursor: pointer;">
+                                    <input type="checkbox" id="wpp_priority_checkbox_block" 
+                                           class="wpp-priority-checkbox" 
+                                           <?php echo $is_checked ? 'checked' : ''; ?> 
+                                           style="margin-right: 8px; margin-top: 2px;" />
+                                    <span>
+                                        <strong><?php echo esc_js($checkbox_label); ?>: 
+                                            <?php echo get_woocommerce_currency_symbol() . number_format($fee_amount, 2); ?></strong>
+                                        <?php if ($description): ?>
+                                            <br><small style="color: #666; display: block; margin-top: 4px;">
+                                                <?php echo esc_js($description); ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </span>
+                                </label>
+                            </div>
+                        `;
+
+              // Try to insert before order summary
+              if (orderSummary) {
+                orderSummary.insertAdjacentHTML('beforebegin', priorityHtml);
+              } else {
+                // Fallback: insert at the beginning of checkout form
+                checkoutForm.insertAdjacentHTML('afterbegin', priorityHtml);
+              }
+            }
+          }, 1000);
+        });
+      </script>
+    <?php
+    });
+  }
+
+  public function update_order_from_block_checkout($order, $request)
+  {
+    $priority = WC()->session ? WC()->session->get('priority_processing', false) : false;
+    if ($priority) {
+      $order->update_meta_data('_priority_processing', 'yes');
+    }
   }
 
   public function frontend_scripts()
@@ -279,7 +400,7 @@ class WooCommerce_Priority_Processing
       return;
     }
 
-    $priority = WC()->session->get('priority_processing', false);
+    $priority = WC()->session ? WC()->session->get('priority_processing', false) : false;
 
     if ($priority) {
       $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
@@ -291,7 +412,7 @@ class WooCommerce_Priority_Processing
 
   public function save_priority_to_order($order, $data)
   {
-    $priority = WC()->session->get('priority_processing', false);
+    $priority = WC()->session ? WC()->session->get('priority_processing', false) : false;
     if ($priority) {
       $order->update_meta_data('_priority_processing', 'yes');
       $order->save_meta_data();

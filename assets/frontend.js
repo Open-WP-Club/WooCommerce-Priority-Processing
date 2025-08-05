@@ -1,7 +1,10 @@
 jQuery(document).ready(function($) {
-    // Handle priority checkbox change
-    $(document).on('change', '#wpp_priority_checkbox', function() {
+    // Handle priority checkbox change (support multiple selectors including block checkout)
+    $(document).on('change', '#wpp_priority_checkbox, #wpp_priority_checkbox_fallback, #wpp_priority_checkbox_block, .wpp-priority-checkbox', function() {
         var isChecked = $(this).is(':checked') ? '1' : '0';
+        
+        // Sync all checkboxes
+        $('.wpp-priority-checkbox, #wpp_priority_checkbox, #wpp_priority_checkbox_fallback, #wpp_priority_checkbox_block').prop('checked', $(this).is(':checked'));
         
         // Block checkout UI during update
         $('.woocommerce-checkout').block({
