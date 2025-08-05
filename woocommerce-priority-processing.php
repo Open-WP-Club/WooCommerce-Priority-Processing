@@ -2,10 +2,10 @@
 
 /**
  * Plugin Name: WooCommerce Priority Processing
- * Plugin URI: https://example.com/woo-priority-processing
  * Description: Add priority processing and express shipping option at checkout
  * Version: 1.0.0
- * Author: Your Name
+ * Author: OpenWPClub.com
+ * Author URI: https://openwpclub.com
  * License: GPL v2 or later
  * Text Domain: woo-priority
  * Requires at least: 5.8
