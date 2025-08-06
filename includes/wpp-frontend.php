@@ -11,24 +11,24 @@ class WPP_Frontend
     add_action('wp_ajax_nopriv_wpp_update_priority', [$this, 'ajax_update_priority']);
     add_action('woocommerce_cart_calculate_fees', [$this, 'add_priority_fee']);
     add_action('woocommerce_checkout_create_order', [$this, 'save_priority_to_order'], 10, 2);
-    
+
     // Clear priority session when order is completed
     add_action('woocommerce_thankyou', [$this, 'clear_priority_session']);
     add_action('woocommerce_order_status_completed', [$this, 'clear_priority_session']);
     add_action('woocommerce_order_status_processing', [$this, 'clear_priority_session']);
-    
+
     // Reset priority on cart emptied
     add_action('woocommerce_cart_emptied', [$this, 'clear_priority_session']);
-    
+
     // Initialize session properly
     add_action('init', [$this, 'init_session']);
-    
+
     // Reset priority when accessing checkout page without explicit session
     add_action('template_redirect', [$this, 'maybe_reset_priority_on_checkout']);
-    
+
     // Clear priority when starting fresh checkout
     add_action('woocommerce_before_checkout_form', [$this, 'check_and_reset_priority'], 5);
-    
+
     // Force clear stale fees
     add_action('woocommerce_before_calculate_totals', [$this, 'remove_stale_fees'], 5);
   }
@@ -75,19 +75,19 @@ class WPP_Frontend
       error_log('WPP: Cart hash changed or empty, resetting priority. Current: ' . $current_cart_hash . ', Stored: ' . $stored_cart_hash);
       WC()->session->set('priority_processing', false);
       WC()->session->set('wpp_cart_hash', $current_cart_hash);
-      
+
       // Force remove any existing priority fees
       if (WC()->cart) {
         $fee_label = get_option('wpp_fee_label');
         $fees = WC()->cart->get_fees();
-        
+
         foreach ($fees as $fee_key => $fee) {
           if ($fee->name === $fee_label) {
             unset(WC()->cart->fees[$fee_key]);
             error_log('WPP: Manually removed priority fee during reset');
           }
         }
-        
+
         // Force cart recalculation
         WC()->cart->calculate_fees();
         WC()->cart->calculate_totals();
@@ -95,10 +95,50 @@ class WPP_Frontend
     }
   }
 
+  public function remove_stale_fees($cart)
+  {
+    if (!is_checkout() || get_option('wpp_enabled') !== '1') {
+      error_log('WPP: remove_stale_fees - Not checkout or plugin disabled');
+      return;
+    }
+
+    if (!WC()->session) {
+      error_log('WPP: remove_stale_fees - No session');
+      return;
+    }
+
+    $priority = WC()->session->get('priority_processing', false);
+    $fee_label = get_option('wpp_fee_label');
+
+    error_log('WPP: remove_stale_fees - Priority state: ' . ($priority ? 'true' : 'false'));
+
+    // If priority is disabled, remove any existing priority fees
+    if ($priority !== true && $priority !== '1') {
+      $fees = $cart->get_fees();
+      error_log('WPP: remove_stale_fees - Found ' . count($fees) . ' existing fees');
+
+      $removed_count = 0;
+      foreach ($fees as $fee_key => $fee) {
+        error_log('WPP: remove_stale_fees - Checking fee: ' . $fee->name . ' vs ' . $fee_label);
+        if ($fee->name === $fee_label) {
+          unset($cart->fees[$fee_key]);
+          $removed_count++;
+          error_log('WPP: Removed stale priority fee: ' . $fee->name);
+        }
+      }
+
+      if ($removed_count === 0) {
+        error_log('WPP: No priority fees found to remove');
+      }
+    } else {
+      error_log('WPP: Priority is enabled, not removing fees');
+    }
+  }
+
   public function add_priority_checkbox()
   {
     error_log('WPP: add_priority_checkbox() called');
-    
+
     if (get_option('wpp_enabled') !== '1') {
       error_log('WPP: Plugin disabled, not showing checkbox. wpp_enabled = ' . get_option('wpp_enabled'));
       return;
@@ -107,7 +147,7 @@ class WPP_Frontend
     $fee_amount = get_option('wpp_fee_amount', '5.00');
     $checkbox_label = get_option('wpp_checkbox_label');
     $description = get_option('wpp_description');
-    
+
     error_log('WPP: Settings - Fee: ' . $fee_amount . ', Label: ' . $checkbox_label);
 
     // Ensure session is initialized
@@ -160,15 +200,14 @@ class WPP_Frontend
         </div>
       </td>
     </tr>
-    <?php
+  <?php
     error_log('WPP: Checkbox HTML output completed');
-  }
   }
 
   public function add_priority_checkbox_fallback()
   {
     error_log('WPP: add_priority_checkbox_fallback() called');
-    
+
     if (get_option('wpp_enabled') !== '1') {
       error_log('WPP: Plugin disabled, not showing fallback checkbox');
       return;
@@ -257,12 +296,12 @@ class WPP_Frontend
 
     // Store as boolean for consistency
     WC()->session->set('priority_processing', $priority);
-    
+
     // Store cart hash to track session state
     if (WC()->cart) {
       WC()->session->set('wpp_cart_hash', WC()->cart->get_cart_hash());
     }
-    
+
     // Mark that priority has been explicitly set
     $_POST['wpp_priority_set'] = true;
 
@@ -298,46 +337,6 @@ class WPP_Frontend
     ]);
   }
 
-  public function remove_stale_fees($cart)
-  {
-    if (!is_checkout() || get_option('wpp_enabled') !== '1') {
-      error_log('WPP: remove_stale_fees - Not checkout or plugin disabled');
-      return;
-    }
-
-    if (!WC()->session) {
-      error_log('WPP: remove_stale_fees - No session');
-      return;
-    }
-
-    $priority = WC()->session->get('priority_processing', false);
-    $fee_label = get_option('wpp_fee_label');
-    
-    error_log('WPP: remove_stale_fees - Priority state: ' . ($priority ? 'true' : 'false'));
-    
-    // If priority is disabled, remove any existing priority fees
-    if ($priority !== true && $priority !== '1') {
-      $fees = $cart->get_fees();
-      error_log('WPP: remove_stale_fees - Found ' . count($fees) . ' existing fees');
-      
-      $removed_count = 0;
-      foreach ($fees as $fee_key => $fee) {
-        error_log('WPP: remove_stale_fees - Checking fee: ' . $fee->name . ' vs ' . $fee_label);
-        if ($fee->name === $fee_label) {
-          unset($cart->fees[$fee_key]);
-          $removed_count++;
-          error_log('WPP: Removed stale priority fee: ' . $fee->name);
-        }
-      }
-      
-      if ($removed_count === 0) {
-        error_log('WPP: No priority fees found to remove');
-      }
-    } else {
-      error_log('WPP: Priority is enabled, not removing fees');
-    }
-  }
-
   public function add_priority_fee()
   {
     if (!is_checkout() || get_option('wpp_enabled') !== '1') {
@@ -351,24 +350,24 @@ class WPP_Frontend
 
     $priority = WC()->session->get('priority_processing', false);
     $fee_label = get_option('wpp_fee_label');
-    
+
     error_log('WPP: Fee calculation - Priority state: ' . ($priority ? 'true' : 'false'));
-    
+
     // Only add fee if priority is explicitly enabled
     if ($priority === true || $priority === '1') {
       $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
-      
+
       // Check if fee already exists
       $existing_fees = WC()->cart->get_fees();
       $fee_exists = false;
-      
+
       foreach ($existing_fees as $fee) {
         if ($fee->name === $fee_label) {
           $fee_exists = true;
           break;
         }
       }
-      
+
       if (!$fee_exists && $fee_amount > 0) {
         WC()->cart->add_fee($fee_label, $fee_amount, true);
         error_log('WPP: Priority fee added: ' . $fee_amount);
