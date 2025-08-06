@@ -1,21 +1,33 @@
 jQuery(document).ready(function($) {
-    // Handle priority checkbox change (support multiple selectors including block checkout)
-    $(document).on('change', '#wpp_priority_checkbox, #wpp_priority_checkbox_fallback, #wpp_priority_checkbox_block, .wpp-priority-checkbox', function() {
-        var isChecked = $(this).is(':checked') ? '1' : '0';
+    console.log('WPP: Frontend script loaded');
+    
+    // Handle priority checkbox change
+    $(document).on('change', '.wpp-priority-checkbox', function() {
+        console.log('WPP: Checkbox changed');
+        
+        var $checkbox = $(this);
+        var isChecked = $checkbox.is(':checked') ? '1' : '0';
+        console.log('WPP: Checkbox state:', isChecked);
         
         // Sync all checkboxes
-        $('.wpp-priority-checkbox, #wpp_priority_checkbox, #wpp_priority_checkbox_fallback, #wpp_priority_checkbox_block').prop('checked', $(this).is(':checked'));
+        $('.wpp-priority-checkbox').prop('checked', $checkbox.is(':checked'));
         
-        // Block checkout UI during update
-        $('.woocommerce-checkout').block({
-            message: null,
-            overlayCSS: {
-                background: '#fff',
-                opacity: 0.6
-            }
-        });
+        // Disable checkbox during update
+        $('.wpp-priority-checkbox').prop('disabled', true);
         
-        // Send AJAX request to update session
+        // Block checkout UI
+        if ($('form.checkout').length) {
+            $('form.checkout').block({
+                message: null,
+                overlayCSS: {
+                    background: '#fff',
+                    opacity: 0.6
+                }
+            });
+        }
+        
+        console.log('WPP: Sending AJAX request...');
+        
         $.ajax({
             type: 'POST',
             url: wpp_ajax.ajax_url,
@@ -25,19 +37,49 @@ jQuery(document).ready(function($) {
                 nonce: wpp_ajax.nonce
             },
             success: function(response) {
-                // Trigger checkout update to refresh totals
-                $(document.body).trigger('update_checkout');
+                console.log('WPP: AJAX success:', response);
+                
+                if (response.success && response.data.fragments) {
+                    // Update fragments manually
+                    $.each(response.data.fragments, function(key, value) {
+                        if ($(key).length) {
+                            $(key).replaceWith(value);
+                        }
+                    });
+                    console.log('WPP: Fragments updated');
+                }
+                
+                // Re-enable checkboxes
+                $('.wpp-priority-checkbox').prop('disabled', false);
+                
+                // Trigger body update for other plugins
+                $(document.body).trigger('updated_checkout');
             },
-            error: function() {
-                console.error('Failed to update priority processing');
-                $('.woocommerce-checkout').unblock();
+            error: function(xhr, status, error) {
+                console.error('WPP: AJAX error:', status, error);
+                console.error('WPP: Response:', xhr.responseText);
+                
+                // Revert checkbox state
+                $('.wpp-priority-checkbox').prop('checked', !$checkbox.is(':checked'));
+                $('.wpp-priority-checkbox').prop('disabled', false);
+                
+                alert('Failed to update priority processing. Please try again.');
+            },
+            complete: function() {
+                // Always unblock
+                if ($('form.checkout').length) {
+                    $('form.checkout').unblock();
+                }
             }
         });
     });
     
-    // Maintain checkbox state after checkout updates
+    // Unblock on checkout updates
     $(document.body).on('updated_checkout', function() {
-        // The checkbox state is maintained server-side via session
-        // This ensures it persists through checkout updates
+        console.log('WPP: Checkout updated');
+        if ($('form.checkout').length) {
+            $('form.checkout').unblock();
+        }
+        $('.wpp-priority-checkbox').prop('disabled', false);
     });
 });

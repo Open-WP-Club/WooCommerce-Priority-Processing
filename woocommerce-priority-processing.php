@@ -228,16 +228,22 @@ class WooCommerce_Priority_Processing
 
   ?>
     <tr class="wpp-priority-row">
-      <td colspan="2" style="padding: 10px;">
-        <div id="wpp-priority-option" style="background: #f7f7f7; padding: 12px; border-radius: 4px;">
-          <label style="display: flex; align-items: flex-start; cursor: pointer;">
-            <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox" name="priority_processing" value="1"
-              <?php checked($is_checked); ?> style="margin-right: 8px; margin-top: 2px;" />
+      <td colspan="2" style="border-top: 2px solid #e0e0e0; padding: 15px 0 10px 0;">
+        <div id="wpp-priority-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6;">
+          <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">
+            ⚡ <?php _e('Express Options', 'woo-priority'); ?>
+          </h4>
+          <label style="display: flex; align-items: flex-start; cursor: pointer; font-size: 14px;">
+            <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox"
+              name="priority_processing" value="1" <?php checked($is_checked); ?>
+              style="margin-right: 10px; margin-top: 2px; transform: scale(1.1);" />
             <span>
-              <strong><?php echo esc_html($checkbox_label); ?>:
-                <?php echo wc_price($fee_amount); ?></strong>
+              <strong style="color: #28a745;">
+                <?php echo esc_html($checkbox_label); ?>
+                <span style="color: #dc3545;">(+<?php echo wc_price($fee_amount); ?>)</span>
+              </strong>
               <?php if ($description): ?>
-                <br><small style="color: #666; display: block; margin-top: 4px;">
+                <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
                   <?php echo esc_html($description); ?>
                 </small>
               <?php endif; ?>
@@ -284,7 +290,7 @@ class WooCommerce_Priority_Processing
     <script>
       jQuery(function($) {
         // Remove duplicate if table version exists
-        if ($('#wpp-priority-option').length > 0) {
+        if ($('#wpp-priority-section').length > 0) {
           $('#wpp-priority-option-fallback').remove();
         }
       });
@@ -376,17 +382,59 @@ class WooCommerce_Priority_Processing
 
   public function ajax_update_priority()
   {
-    check_ajax_referer('wpp_nonce', 'nonce');
+    error_log('WPP: AJAX request received');
+
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wpp_nonce')) {
+      error_log('WPP: Nonce verification failed');
+      wp_send_json_error('Invalid nonce');
+      return;
+    }
+
+    // Check if WC session exists
+    if (!WC()->session) {
+      error_log('WPP: WC session not available');
+      wp_send_json_error('Session not available');
+      return;
+    }
 
     $priority = isset($_POST['priority']) && $_POST['priority'] === '1';
+    error_log('WPP: Setting priority to: ' . ($priority ? 'true' : 'false'));
+
+    // Set session data
     WC()->session->set('priority_processing', $priority);
 
-    // Trigger cart recalculation
-    WC()->cart->calculate_fees();
-    WC()->cart->calculate_totals();
+    // Ensure cart exists and recalculate
+    if (WC()->cart) {
+      WC()->cart->calculate_fees();
+      WC()->cart->calculate_totals();
+      error_log('WPP: Cart totals recalculated');
+    }
+
+    // Force fragments generation
+    ob_start();
+    woocommerce_order_review();
+    $order_review = ob_get_clean();
+
+    ob_start();
+    woocommerce_checkout_payment();
+    $payment_methods = ob_get_clean();
+
+    $fragments = [
+      '.woocommerce-checkout-review-order-table' => $order_review,
+      '.woocommerce-checkout-payment' => $payment_methods,
+      'div.woocommerce-checkout-review-order' => '<div class="woocommerce-checkout-review-order">' . $order_review . '</div>',
+    ];
+
+    // Apply WooCommerce filters
+    $fragments = apply_filters('woocommerce_update_order_review_fragments', $fragments);
+
+    error_log('WPP: Generated ' . count($fragments) . ' fragments');
 
     wp_send_json_success([
-      'fragments' => apply_filters('woocommerce_update_order_review_fragments', [])
+      'fragments' => $fragments,
+      'priority' => $priority,
+      'cart_hash' => WC()->cart->get_cart_hash()
     ]);
   }
 
