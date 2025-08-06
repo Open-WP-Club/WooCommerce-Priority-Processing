@@ -3,6 +3,7 @@ jQuery(document).ready(function($) {
     
     var checkboxInjected = false;
     var checkboxState = sessionStorage.getItem('wpp_priority_state') === 'true' || false;
+    var isUpdating = false;
     
     // Configuration from PHP
     var config = {
@@ -29,7 +30,7 @@ jQuery(document).ready(function($) {
                     <span>
                         <strong style="color: #28a745; display: block;">
                             ${config.checkbox_label}
-                            <span style="color: #dc3545; font-weight: normal;">(+${config.fee_amount})</span>
+                            <span style="color: #dc3545; font-weight: normal;">(+$${config.fee_amount})</span>
                         </strong>
                         ${config.description ? `<small style="color: #6c757d; display: block; margin-top: 6px; line-height: 1.4;">${config.description}</small>` : ''}
                     </span>
@@ -38,11 +39,59 @@ jQuery(document).ready(function($) {
         `;
     }
     
+    // Function to inject custom fee line in order summary
+    function injectFeeLineInOrderSummary() {
+        // Remove existing custom fee line
+        $('#wpp-custom-fee-line').remove();
+        
+        if (!checkboxState) {
+            return; // Don't show fee line if not checked
+        }
+        
+        // Try to find the subtotal row to insert after it
+        var $subtotalRow = $('.wc-block-components-totals-item').filter(function() {
+            return $(this).find('.wc-block-components-totals-item__label').text().toLowerCase().includes('subtotal');
+        });
+        
+        if ($subtotalRow.length > 0) {
+            var feeHTML = `
+                <div id="wpp-custom-fee-line" class="wc-block-components-totals-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e1e4e8;">
+                    <span class="wc-block-components-totals-item__label" style="font-weight: 500;">
+                        Priority Processing & Express Shipping
+                    </span>
+                    <span class="wc-block-components-totals-item__value" style="font-weight: 600; color: #d63638;">
+                        ${config.fee_amount} лв.
+                    </span>
+                </div>
+            `;
+            
+            $subtotalRow.after(feeHTML);
+            console.log('WPP: Custom fee line injected after subtotal');
+        } else {
+            // Fallback - try to inject after any totals wrapper
+            var $totalsWrapper = $('.wc-block-components-totals-wrapper, .wc-block-components-totals');
+            if ($totalsWrapper.length > 0) {
+                var feeHTML = `
+                    <div id="wpp-custom-fee-line" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; margin: 10px 0;">
+                        <span style="font-weight: 500;">Priority Processing & Express Shipping</span>
+                        <span style="font-weight: 600; color: #d63638;">${config.fee_amount} лв.</span>
+                    </div>
+                `;
+                
+                $totalsWrapper.prepend(feeHTML);
+                console.log('WPP: Custom fee line injected in totals wrapper');
+            }
+        }
+    }
+    
     // Function to inject checkbox into block checkout
     function injectCheckbox() {
-        // Remove existing checkbox first
-        $('#wpp-priority-block-section').remove();
-        checkboxInjected = false;
+        // Don't inject if already exists or if we're in the middle of an update
+        if ($('#wpp-priority-block-section').length > 0 || isUpdating) {
+            return;
+        }
+        
+        console.log('WPP: Attempting to inject checkbox');
         
         // Try different selectors to find where to inject the checkbox
         var targetSelectors = [
@@ -62,6 +111,7 @@ jQuery(document).ready(function($) {
                 $target.before(createCheckboxHTML());
                 checkboxInjected = true;
                 injected = true;
+                bindCheckboxEvents();
                 break;
             }
         }
@@ -74,33 +124,55 @@ jQuery(document).ready(function($) {
                 $checkout.prepend(createCheckboxHTML());
                 checkboxInjected = true;
                 injected = true;
+                bindCheckboxEvents();
             }
         }
         
-        if (injected) {
-            bindCheckboxEvents();
-        } else {
+        if (!injected) {
             console.log('WPP: Could not find suitable injection point');
+        } else {
+            // Also inject the fee line if checkbox should be checked
+            setTimeout(injectFeeLineInOrderSummary, 200);
         }
     }
     
     // Function to bind checkbox events
     function bindCheckboxEvents() {
-        $(document).off('change', '.wpp-priority-checkbox').on('change', '.wpp-priority-checkbox', function() {
+        // Remove any existing handlers to prevent duplicates
+        $(document).off('change.wpp', '.wpp-priority-checkbox');
+        
+        // Bind with namespaced event to avoid conflicts
+        $(document).on('change.wpp', '.wpp-priority-checkbox', function(e) {
+            // Prevent event bubbling
+            e.stopPropagation();
+            
+            // Prevent multiple simultaneous updates
+            if (isUpdating) {
+                console.log('WPP: Update already in progress, ignoring click');
+                return false;
+            }
+            
             var $checkbox = $(this);
             var isChecked = $checkbox.is(':checked');
-            checkboxState = isChecked;
-            
-            // Store state in sessionStorage to persist across page updates
-            sessionStorage.setItem('wpp_priority_state', isChecked.toString());
             
             console.log('WPP: Block checkbox changed to:', isChecked);
             
-            // Disable checkbox during update
-            $('.wpp-priority-checkbox').prop('disabled', true);
+            // Set updating flag
+            isUpdating = true;
+            checkboxState = isChecked;
             
-            // Update all checkboxes
-            $('.wpp-priority-checkbox').prop('checked', isChecked);
+            // Store state in sessionStorage
+            sessionStorage.setItem('wpp_priority_state', isChecked.toString());
+            
+            // Immediately update the custom fee line display
+            if (isChecked) {
+                injectFeeLineInOrderSummary();
+            } else {
+                $('#wpp-custom-fee-line').remove();
+            }
+            
+            // Disable all checkboxes during update
+            $('.wpp-priority-checkbox').prop('disabled', true);
             
             // Send AJAX request
             $.ajax({
@@ -115,46 +187,53 @@ jQuery(document).ready(function($) {
                     console.log('WPP: Block AJAX success:', response);
                     
                     if (response.success) {
-                        // DON'T refresh the page - let WooCommerce blocks handle the update
-                        console.log('WPP: Priority updated successfully, no page refresh needed');
+                        console.log('WPP: Priority updated successfully');
                         
-                        // Try to trigger block checkout updates without page refresh
-                        if (typeof window.wc !== 'undefined' && window.wc.wcBlocksData) {
-                            console.log('WPP: Triggering WooCommerce blocks update');
-                            $(document.body).trigger('wc-blocks-checkout-set-checkout-data');
-                        }
+                        // Update the checkbox state to match what we sent
+                        $('.wpp-priority-checkbox').prop('checked', isChecked);
                         
-                        // Trigger custom events that might update totals
-                        $(document.body).trigger('wc_update_cart');
-                        $(document.body).trigger('updated_wc_div');
-                        
-                        // Update the displayed fee amount in the checkbox label if needed
+                        // Update the fee line display
                         setTimeout(function() {
-                            // Re-inject checkbox to ensure it stays visible and maintains state
-                            if (!$('#wpp-priority-block-section').length) {
-                                console.log('WPP: Re-injecting checkbox after update');
-                                injectCheckbox();
+                            if (isChecked) {
+                                injectFeeLineInOrderSummary();
+                            } else {
+                                $('#wpp-custom-fee-line').remove();
                             }
-                        }, 100);
+                        }, 500);
                         
                     } else {
                         console.error('WPP: Block AJAX failed:', response);
-                        // Revert checkbox
+                        // Revert checkbox state
                         $('.wpp-priority-checkbox').prop('checked', !isChecked);
                         checkboxState = !isChecked;
                         sessionStorage.setItem('wpp_priority_state', (!isChecked).toString());
+                        
+                        // Revert fee line
+                        if (!isChecked) {
+                            injectFeeLineInOrderSummary();
+                        } else {
+                            $('#wpp-custom-fee-line').remove();
+                        }
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('WPP: Block AJAX error:', status, error);
-                    // Revert checkbox
+                    // Revert checkbox state
                     $('.wpp-priority-checkbox').prop('checked', !isChecked);
                     checkboxState = !isChecked;
                     sessionStorage.setItem('wpp_priority_state', (!isChecked).toString());
+                    
+                    // Revert fee line
+                    if (!isChecked) {
+                        injectFeeLineInOrderSummary();
+                    } else {
+                        $('#wpp-custom-fee-line').remove();
+                    }
                 },
                 complete: function() {
-                    // Re-enable checkbox
+                    // Re-enable checkbox and clear updating flag
                     $('.wpp-priority-checkbox').prop('disabled', false);
+                    isUpdating = false;
                 }
             });
         });
@@ -171,10 +250,10 @@ jQuery(document).ready(function($) {
             // Look for block checkout elements
             var $blockCheckout = $('.wp-block-woocommerce-checkout, .wc-block-checkout');
             
-            if ($blockCheckout.length > 0) {
+            if ($blockCheckout.length > 0 && !$('#wpp-priority-block-section').length) {
                 console.log('WPP: Block checkout detected, injecting checkbox');
                 clearInterval(checkInterval);
-                setTimeout(injectCheckbox, 500); // Small delay to ensure blocks are fully loaded
+                setTimeout(injectCheckbox, 500);
             } else if (attempts >= maxAttempts) {
                 console.log('WPP: Block checkout not found after', maxAttempts, 'attempts');
                 clearInterval(checkInterval);
@@ -186,28 +265,50 @@ jQuery(document).ready(function($) {
     waitForBlocks();
     
     // Also try immediate injection in case blocks are already loaded
-    setTimeout(injectCheckbox, 1000);
+    setTimeout(function() {
+        if (!$('#wpp-priority-block-section').length) {
+            injectCheckbox();
+        }
+    }, 1000);
     
-    // Re-inject checkbox when DOM changes (but preserve state)
+    // Simplified DOM observer - only watch for major changes
     var observer = new MutationObserver(function(mutations) {
+        var shouldReinject = false;
+        var shouldUpdateFeeLine = false;
+        
         mutations.forEach(function(mutation) {
             if (mutation.type === 'childList') {
-                // Check if our checkbox is still present
-                if (!$('#wpp-priority-block-section').length && $('.wp-block-woocommerce-checkout').length > 0) {
-                    console.log('WPP: Checkbox missing after DOM change, re-injecting');
-                    setTimeout(injectCheckbox, 200);
+                // Only re-inject if our checkbox is completely missing and checkout blocks exist
+                if (!$('#wpp-priority-block-section').length && 
+                    $('.wp-block-woocommerce-checkout').length > 0 && 
+                    !isUpdating) {
+                    shouldReinject = true;
+                }
+                
+                // Check if we need to update the fee line
+                if (checkboxState && !$('#wpp-custom-fee-line').length && 
+                    $('.wc-block-components-totals-item').length > 0) {
+                    shouldUpdateFeeLine = true;
                 }
             }
         });
+        
+        if (shouldReinject) {
+            console.log('WPP: Checkbox missing, re-injecting');
+            setTimeout(injectCheckbox, 200);
+        } else if (shouldUpdateFeeLine) {
+            console.log('WPP: Fee line missing, re-injecting');
+            setTimeout(injectFeeLineInOrderSummary, 200);
+        }
     });
     
-    // Start observing
+    // Start observing with less aggressive settings
     observer.observe(document.body, {
         childList: true,
-        subtree: true
+        subtree: false // Only watch direct children, not deep changes
     });
     
-    // Clear session storage when leaving the page (except to thank you page)
+    // Clear session storage when leaving checkout
     $(window).on('beforeunload', function() {
         if (window.location.href.indexOf('order-received') === -1) {
             sessionStorage.removeItem('wpp_priority_state');

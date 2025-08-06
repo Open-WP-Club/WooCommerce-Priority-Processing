@@ -237,7 +237,12 @@ class WPP_Frontend
     error_log('WPP: AJAX - Session ID before: ' . WC()->session->get_customer_id());
 
     // Store as proper boolean - this should prevent empty string storage
-    WC()->session->set('priority_processing', $priority ? true : false);
+    if ($priority) {
+      WC()->session->set('priority_processing', true);
+    } else {
+      // Explicitly set to false, not empty string
+      WC()->session->set('priority_processing', false);
+    }
 
     // Verify it was stored
     $stored_priority = WC()->session->get('priority_processing', 'NOT_FOUND');
