@@ -35,6 +35,7 @@ add_action('before_woocommerce_init', function () {
 require_once WPP_PLUGIN_DIR . 'includes/wpp-admin.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-frontend.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-orders.php';
+// wpp-wc-settings.php is included conditionally by wpp-admin.php
 
 class WooCommerce_Priority_Processing
 {
@@ -95,6 +96,7 @@ class WooCommerce_Priority_Processing
     register_setting('wpp_settings', 'wpp_checkbox_label');
     register_setting('wpp_settings', 'wpp_description');
     register_setting('wpp_settings', 'wpp_fee_label');
+    register_setting('wpp_settings', 'wpp_section_title');
 
     // Set defaults if not set
     if (get_option('wpp_fee_amount') === false) {
@@ -108,6 +110,9 @@ class WooCommerce_Priority_Processing
     }
     if (get_option('wpp_fee_label') === false) {
       update_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
+    }
+    if (get_option('wpp_section_title') === false) {
+      update_option('wpp_section_title', __('Express Options', 'woo-priority'));
     }
     if (get_option('wpp_enabled') === false) {
       update_option('wpp_enabled', '1');
@@ -136,6 +141,7 @@ register_activation_hook(__FILE__, function () {
   add_option('wpp_checkbox_label', __('Priority processing + Express shipping', 'woo-priority'));
   add_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
   add_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
+  add_option('wpp_section_title', __('Express Options', 'woo-priority'));
 });
 
 // Deactivation hook
