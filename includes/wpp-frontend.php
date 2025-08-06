@@ -32,8 +32,12 @@ class WPP_Frontend
     // Force clear stale fees
     add_action('woocommerce_before_calculate_totals', [$this, 'remove_stale_fees'], 5);
 
-    // Add fee display in checkout
-    add_action('woocommerce_review_order_before_order_total', [$this, 'display_priority_fee_line'], 10);
+    // Don't display manual fee line - let WooCommerce handle it completely
+    // add_action('woocommerce_review_order_before_order_total', [$this, 'display_priority_fee_in_checkout'], 10);
+    add_filter('woocommerce_cart_totals_fee_html', [$this, 'format_fee_html'], 10, 2);
+
+    // Ensure fee is included in total calculation
+    add_filter('woocommerce_calculated_total', [$this, 'include_priority_fee_in_total'], 10, 2);
   }
 
   public function init_session()
@@ -269,6 +273,37 @@ class WPP_Frontend
     }
   }
 
+  public function include_priority_fee_in_total($total, $cart)
+  {
+    if (!WC()->session) {
+      return $total;
+    }
+
+    $priority = WC()->session->get('priority_processing', false);
+
+    if ($priority === true || $priority === '1') {
+      $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+      if ($fee_amount > 0) {
+        $new_total = $total + $fee_amount;
+        error_log('WPP: Total calculation filter - Original: ' . $total . ', Fee: ' . $fee_amount . ', New Total: ' . $new_total);
+        return $new_total;
+      }
+    }
+
+    return $total;
+  }
+
+  public function format_fee_html($fee_html, $fee)
+  {
+    // Ensure our priority fee is properly formatted
+    $fee_label = get_option('wpp_fee_label');
+    if ($fee->name === $fee_label) {
+      error_log('WPP: Formatting fee HTML for: ' . $fee->name . ' = ' . $fee->amount);
+      return wc_price($fee->amount);
+    }
+    return $fee_html;
+  }
+
   public function ajax_update_priority()
   {
     error_log('WPP: AJAX request received');
@@ -370,7 +405,7 @@ class WPP_Frontend
     $priority = WC()->session->get('priority_processing', false);
     $fee_label = get_option('wpp_fee_label');
 
-    error_log('WPP: Fee calculation - Priority state: ' . ($priority ? 'true' : 'false'));
+    error_log('WPP: Fee calculation hook - Priority state: ' . ($priority ? 'true' : 'false'));
 
     // Only add fee if priority is explicitly enabled
     if ($priority === true || $priority === '1') {
@@ -383,31 +418,33 @@ class WPP_Frontend
       foreach ($existing_fees as $fee) {
         if ($fee->name === $fee_label) {
           $fee_exists = true;
-          error_log('WPP: Fee already exists, skipping addition');
+          error_log('WPP: Fee already exists in cart, skipping addition');
           break;
         }
       }
 
       if (!$fee_exists && $fee_amount > 0) {
-        // Add fee with tax calculation enabled
+        // Add fee to WooCommerce - this should make it appear in totals
         WC()->cart->add_fee($fee_label, $fee_amount, true);
-        error_log('WPP: Priority fee added: ' . $fee_amount);
+        error_log('WPP: Added fee to WooCommerce cart: ' . $fee_amount);
 
-        // Verify the fee was actually added (without triggering recalculation)
+        // Verify the fee was actually added to the cart
         $fees_after = WC()->cart->get_fees();
         $fee_found = false;
         foreach ($fees_after as $fee) {
           if ($fee->name === $fee_label) {
             $fee_found = true;
-            error_log('WPP: Verified fee exists after addition: ' . $fee->amount);
+            error_log('WPP: Verified fee in cart: ' . $fee->name . ' = ' . $fee->amount . ' (total: ' . $fee->total . ', tax: ' . $fee->tax . ')');
             break;
           }
         }
 
         if (!$fee_found) {
-          error_log('WPP: ERROR - Fee was not found after addition!');
+          error_log('WPP: ERROR - Fee was not found in cart after addition!');
         }
       }
+    } else {
+      error_log('WPP: Priority disabled, no fee will be added by hook');
     }
   }
 
