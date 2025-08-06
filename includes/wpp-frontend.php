@@ -31,6 +31,9 @@ class WPP_Frontend
 
     // Force clear stale fees
     add_action('woocommerce_before_calculate_totals', [$this, 'remove_stale_fees'], 5);
+
+    // Add fee display in checkout
+    add_action('woocommerce_review_order_before_order_total', [$this, 'display_priority_fee_line'], 10);
   }
 
   public function init_session()
@@ -88,9 +91,8 @@ class WPP_Frontend
           }
         }
 
-        // Force cart recalculation
-        WC()->cart->calculate_fees();
-        WC()->cart->calculate_totals();
+        // Let WooCommerce handle the recalculation naturally
+        error_log('WPP: Priority reset complete, fees removed');
       }
     }
   }
@@ -98,28 +100,22 @@ class WPP_Frontend
   public function remove_stale_fees($cart)
   {
     if (!is_checkout() || get_option('wpp_enabled') !== '1') {
-      error_log('WPP: remove_stale_fees - Not checkout or plugin disabled');
       return;
     }
 
     if (!WC()->session) {
-      error_log('WPP: remove_stale_fees - No session');
       return;
     }
 
     $priority = WC()->session->get('priority_processing', false);
     $fee_label = get_option('wpp_fee_label');
 
-    error_log('WPP: remove_stale_fees - Priority state: ' . ($priority ? 'true' : 'false'));
-
-    // If priority is disabled, remove any existing priority fees
+    // Only remove fees if priority is explicitly disabled
     if ($priority !== true && $priority !== '1') {
       $fees = $cart->get_fees();
-      error_log('WPP: remove_stale_fees - Found ' . count($fees) . ' existing fees');
 
       $removed_count = 0;
       foreach ($fees as $fee_key => $fee) {
-        error_log('WPP: remove_stale_fees - Checking fee: ' . $fee->name . ' vs ' . $fee_label);
         if ($fee->name === $fee_label) {
           unset($cart->fees[$fee_key]);
           $removed_count++;
@@ -127,11 +123,9 @@ class WPP_Frontend
         }
       }
 
-      if ($removed_count === 0) {
-        error_log('WPP: No priority fees found to remove');
+      if ($removed_count > 0) {
+        error_log('WPP: Removed ' . $removed_count . ' stale fees');
       }
-    } else {
-      error_log('WPP: Priority is enabled, not removing fees');
     }
   }
 
@@ -306,26 +300,50 @@ class WPP_Frontend
     $_POST['wpp_priority_set'] = true;
 
     if (WC()->cart) {
+      // Clear all existing fees first
+      WC()->cart->fees = [];
+      error_log('WPP: AJAX - Cleared all existing fees');
+
+      // Add the new fee if priority is enabled
+      if ($priority) {
+        $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+        $fee_label = get_option('wpp_fee_label');
+        if ($fee_amount > 0) {
+          WC()->cart->add_fee($fee_label, $fee_amount, true);
+          error_log('WPP: AJAX - Added priority fee: ' . $fee_amount);
+        }
+      }
+
+      // Force recalculation
       WC()->cart->calculate_fees();
       WC()->cart->calculate_totals();
       error_log('WPP: Cart totals recalculated');
+
+      // Verify fees and totals after recalculation
+      $fees_after = WC()->cart->get_fees();
+      $cart_total = WC()->cart->get_total('edit');
+      $cart_subtotal = WC()->cart->get_subtotal();
+
+      error_log('WPP: After recalculation:');
+      error_log('WPP: - Found ' . count($fees_after) . ' fees');
+      error_log('WPP: - Cart subtotal: ' . $cart_subtotal);
+      error_log('WPP: - Cart total: ' . $cart_total);
+
+      foreach ($fees_after as $fee) {
+        error_log('WPP: - Fee: ' . $fee->name . ' = ' . $fee->amount);
+      }
     }
 
-    // Force fragments generation
+    // Generate updated checkout fragments
     ob_start();
     woocommerce_order_review();
     $order_review = ob_get_clean();
 
-    ob_start();
-    woocommerce_checkout_payment();
-    $payment_methods = ob_get_clean();
-
     $fragments = [
-      '.woocommerce-checkout-review-order-table' => $order_review,
-      '.woocommerce-checkout-payment' => $payment_methods,
-      'div.woocommerce-checkout-review-order' => '<div class="woocommerce-checkout-review-order">' . $order_review . '</div>',
+      '.woocommerce-checkout-review-order-table' => $order_review
     ];
 
+    // Don't include payment methods fragment as it might be causing layout issues
     $fragments = apply_filters('woocommerce_update_order_review_fragments', $fragments);
 
     error_log('WPP: Generated ' . count($fragments) . ' fragments');
@@ -333,7 +351,8 @@ class WPP_Frontend
     wp_send_json_success([
       'fragments' => $fragments,
       'priority' => $priority,
-      'cart_hash' => WC()->cart->get_cart_hash()
+      'cart_hash' => WC()->cart ? WC()->cart->get_cart_hash() : '',
+      'cart_total' => WC()->cart ? WC()->cart->get_total('edit') : 0
     ]);
   }
 
@@ -364,13 +383,52 @@ class WPP_Frontend
       foreach ($existing_fees as $fee) {
         if ($fee->name === $fee_label) {
           $fee_exists = true;
+          error_log('WPP: Fee already exists, skipping addition');
           break;
         }
       }
 
       if (!$fee_exists && $fee_amount > 0) {
+        // Add fee with tax calculation enabled
         WC()->cart->add_fee($fee_label, $fee_amount, true);
         error_log('WPP: Priority fee added: ' . $fee_amount);
+
+        // Verify the fee was actually added (without triggering recalculation)
+        $fees_after = WC()->cart->get_fees();
+        $fee_found = false;
+        foreach ($fees_after as $fee) {
+          if ($fee->name === $fee_label) {
+            $fee_found = true;
+            error_log('WPP: Verified fee exists after addition: ' . $fee->amount);
+            break;
+          }
+        }
+
+        if (!$fee_found) {
+          error_log('WPP: ERROR - Fee was not found after addition!');
+        }
+      }
+    }
+  }
+
+  public function display_priority_fee_line()
+  {
+    if (!WC()->session) {
+      return;
+    }
+
+    $priority = WC()->session->get('priority_processing', false);
+
+    if ($priority === true || $priority === '1') {
+      $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+      $fee_label = get_option('wpp_fee_label');
+
+      if ($fee_amount > 0) {
+        echo '<tr class="wpp-priority-fee-line">';
+        echo '<th>' . esc_html($fee_label) . '</th>';
+        echo '<td>' . wc_price($fee_amount) . '</td>';
+        echo '</tr>';
+        error_log('WPP: Displayed priority fee line: ' . $fee_amount);
       }
     }
   }
