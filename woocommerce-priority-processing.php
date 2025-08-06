@@ -73,6 +73,10 @@ class WooCommerce_Priority_Processing
 
     // Register settings and defaults
     add_action('admin_init', [$this, 'register_settings']);
+
+    // Add cleanup hooks
+    add_action('woocommerce_cart_emptied', [$this, 'clear_priority_session']);
+    add_action('wp_logout', [$this, 'clear_priority_session']);
   }
 
   public function woocommerce_missing_notice()
@@ -107,6 +111,14 @@ class WooCommerce_Priority_Processing
     }
     if (get_option('wpp_enabled') === false) {
       update_option('wpp_enabled', '1');
+    }
+  }
+
+  public function clear_priority_session()
+  {
+    if (WC()->session) {
+      WC()->session->set('priority_processing', false);
+      error_log('WPP: Priority session cleared by main class');
     }
   }
 }
