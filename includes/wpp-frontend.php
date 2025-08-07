@@ -4,8 +4,6 @@ class WPP_Frontend
 {
   public function __construct()
   {
-    error_log('WPP: Frontend class constructor called');
-
     // Classic WooCommerce checkout hooks
     add_action('woocommerce_review_order_after_cart_contents', [$this, 'add_priority_checkbox']);
     add_action('woocommerce_checkout_before_order_review', [$this, 'add_priority_checkbox_fallback']);
@@ -45,7 +43,6 @@ class WPP_Frontend
   {
     if (WC()->session) {
       WC()->session->set('priority_processing', false);
-      error_log('WPP: Priority session cleared' . ($order_id ? " for order {$order_id}" : ''));
     }
   }
 
@@ -151,7 +148,6 @@ class WPP_Frontend
       $using_blocks = has_block('woocommerce/checkout');
 
       if ($using_blocks) {
-        error_log('WPP: Loading block-compatible scripts');
         wp_enqueue_script('wpp-frontend-blocks', WPP_PLUGIN_URL . 'assets/frontend-blocks.js', ['jquery'], WPP_VERSION, true);
         wp_localize_script('wpp-frontend-blocks', 'wpp_ajax', [
           'ajax_url' => admin_url('admin-ajax.php'),
@@ -163,7 +159,6 @@ class WPP_Frontend
           'using_blocks' => true
         ]);
       } else {
-        error_log('WPP: Loading classic scripts');
         wp_enqueue_script('wpp-frontend', WPP_PLUGIN_URL . 'assets/frontend.js', ['jquery'], WPP_VERSION, true);
         wp_localize_script('wpp-frontend', 'wpp_ajax', [
           'ajax_url' => admin_url('admin-ajax.php'),
@@ -176,11 +171,8 @@ class WPP_Frontend
     }
   }
 
-  // **NEW APPROACH: Don't manage fees in AJAX, just return calculated HTML**
   public function ajax_update_priority()
   {
-    error_log('WPP: AJAX started');
-
     if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wpp_nonce')) {
       wp_send_json_error('Invalid nonce');
       return;
@@ -195,12 +187,10 @@ class WPP_Frontend
     $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
     $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
-    error_log('WPP: Priority requested: ' . ($priority ? 'TRUE' : 'FALSE'));
-
     // Store in session for final order processing
     WC()->session->set('priority_processing', $priority);
 
-    // **GENERATE CUSTOM CHECKOUT HTML WITH CALCULATED TOTALS**
+    // Generate custom checkout HTML with calculated totals
     $cart_subtotal = WC()->cart->get_subtotal();
     $cart_tax = WC()->cart->get_total_tax();
     $shipping_total = WC()->cart->get_shipping_total();
@@ -208,8 +198,6 @@ class WPP_Frontend
     // Calculate new total with or without priority fee
     $priority_fee_amount = $priority ? $fee_amount : 0;
     $new_total = $cart_subtotal + $cart_tax + $shipping_total + $priority_fee_amount;
-
-    error_log('WPP: Calculated totals - Subtotal: ' . $cart_subtotal . ', Fee: ' . $priority_fee_amount . ', New Total: ' . $new_total);
 
     // Generate custom checkout HTML with our calculated totals
     ob_start();
@@ -240,7 +228,7 @@ class WPP_Frontend
           }
         }
 
-        // **ADD CHECKBOX ROW HERE TO PRESERVE IT**
+        // Add checkbox row to preserve it
         $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
         $section_title = get_option('wpp_section_title', 'Express Options');
         $description = get_option('wpp_description', '');
@@ -293,8 +281,6 @@ class WPP_Frontend
 <?php
     $checkout_html = ob_get_clean();
 
-    error_log('WPP: Generated custom HTML with ' . ($priority ? 'priority fee' : 'no priority fee'));
-
     wp_send_json_success([
       'fragments' => ['.woocommerce-checkout-review-order-table' => $checkout_html],
       'debug' => [
@@ -305,7 +291,6 @@ class WPP_Frontend
     ]);
   }
 
-  // **Fee hook only for final order processing, not AJAX**
   public function add_priority_fee()
   {
     // Skip during AJAX - we handle display manually
@@ -324,15 +309,12 @@ class WPP_Frontend
     $priority = WC()->session->get('priority_processing', false);
     $should_add_fee = ($priority === true || $priority === 1 || $priority === '1');
 
-    error_log('WPP: Fee hook (non-AJAX) - Priority: ' . var_export($priority, true) . ', Should add: ' . ($should_add_fee ? 'YES' : 'NO'));
-
     if ($should_add_fee) {
       $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
       $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
       if ($fee_amount > 0) {
         WC()->cart->add_fee($fee_label, $fee_amount);
-        error_log('WPP: Fee hook (non-AJAX) - Added fee: ' . $fee_amount);
       }
     }
   }
@@ -347,7 +329,6 @@ class WPP_Frontend
     if ($priority === true || $priority === 1 || $priority === '1') {
       $order->update_meta_data('_priority_processing', 'yes');
       $order->save_meta_data();
-      error_log('WPP: Priority saved to order: ' . $order->get_id());
     }
   }
 }
