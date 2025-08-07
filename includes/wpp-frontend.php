@@ -28,37 +28,6 @@ class WPP_Frontend
 
     // Initialize session properly
     add_action('init', [$this, 'init_session']);
-
-    // Debug hooks to see which ones fire
-    $debug_hooks = [
-      'woocommerce_review_order_after_cart_contents',
-      'woocommerce_checkout_before_order_review',
-      'woocommerce_checkout_order_review',
-      'woocommerce_checkout_after_customer_details',
-      'woocommerce_checkout_billing'
-    ];
-
-    foreach ($debug_hooks as $hook) {
-      add_action($hook, function () use ($hook) {
-        error_log('WPP: Hook fired: ' . $hook);
-      }, 1);
-    }
-
-    // Check if we're using blocks
-    add_action('wp', function () {
-      if (is_checkout()) {
-        $using_blocks = has_block('woocommerce/checkout');
-        error_log('WPP: Checkout page detected. Using blocks: ' . ($using_blocks ? 'YES' : 'NO'));
-
-        if ($using_blocks) {
-          error_log('WPP: Block-based checkout detected');
-        } else {
-          error_log('WPP: Classic checkout detected');
-        }
-      }
-    });
-
-    error_log('WPP: All hooks registered');
   }
 
   public function init_session()
@@ -92,18 +61,10 @@ class WPP_Frontend
     $section_title = get_option('wpp_section_title', 'Express Options');
 
     // Simple session check - default to false (unchecked)
-    // Handle WooCommerce session quirks where false is stored as empty string
     $is_checked = false;
     if (WC()->session) {
       $session_priority = WC()->session->get('priority_processing', false);
       $is_checked = ($session_priority === true || $session_priority === '1' || $session_priority === 1);
-
-      // Enhanced debugging
-      error_log('WPP: Checkbox render - Session priority: ' . var_export($session_priority, true));
-      error_log('WPP: Checkbox render - Is checked: ' . ($is_checked ? 'true' : 'false'));
-      error_log('WPP: Checkbox render - Session ID: ' . WC()->session->get_customer_id());
-    } else {
-      error_log('WPP: Checkbox render - No WC session available');
     }
 
 ?>
@@ -216,150 +177,168 @@ class WPP_Frontend
 
   public function ajax_update_priority()
   {
-    error_log('WPP: AJAX request received - Raw POST data: ' . print_r($_POST, true));
+    error_log('WPP: AJAX request started');
 
     if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wpp_nonce')) {
       error_log('WPP: Nonce verification failed');
-      wp_send_json_error('Invalid nonce');
+      wp_send_json_error(['message' => 'Security check failed']);
       return;
     }
 
     if (!WC()->session) {
-      error_log('WPP: WC session not available in AJAX');
-      wp_send_json_error('Session not available');
+      error_log('WPP: WC session not available');
+      wp_send_json_error(['message' => 'Session not available']);
+      return;
+    }
+
+    if (!WC()->cart) {
+      error_log('WPP: WC cart not available');
+      wp_send_json_error(['message' => 'Cart not available']);
       return;
     }
 
     $priority = isset($_POST['priority']) && $_POST['priority'] === '1';
+    $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
-    error_log('WPP: AJAX - Priority input: ' . ($_POST['priority'] ?? 'not set'));
-    error_log('WPP: AJAX - Priority boolean: ' . ($priority ? 'true' : 'false'));
-    error_log('WPP: AJAX - Session ID before: ' . WC()->session->get_customer_id());
+    error_log('WPP: AJAX - Priority requested: ' . ($priority ? 'true' : 'false'));
 
-    // Store as proper boolean - this should prevent empty string storage
-    if ($priority) {
-      WC()->session->set('priority_processing', true);
-    } else {
-      // Explicitly set to false, not empty string
-      WC()->session->set('priority_processing', false);
+    // **CRITICAL: Store priority state FIRST before any cart operations**
+    WC()->session->set('priority_processing', $priority);
+
+    // Force save the session immediately
+    if (method_exists(WC()->session, 'save_data')) {
+      WC()->session->save_data();
+      error_log('WPP: AJAX - Session saved immediately');
     }
 
-    // Verify it was stored
-    $stored_priority = WC()->session->get('priority_processing', 'NOT_FOUND');
-    error_log('WPP: AJAX - Stored priority verification: ' . var_export($stored_priority, true));
-    error_log('WPP: AJAX - Session ID after: ' . WC()->session->get_customer_id());
+    // **NEW APPROACH: Let WooCommerce handle fees through its normal hooks**
+    // Clear all existing fees first
+    WC()->cart->fees = [];
 
-    if (WC()->cart) {
-      error_log('WPP: AJAX - Cart available, processing fees');
+    // Trigger fee calculation hooks by recalculating
+    WC()->cart->calculate_fees();
 
-      // Clear existing fees
-      $fees_before = count(WC()->cart->get_fees());
-      WC()->cart->fees = [];
-      error_log('WPP: AJAX - Cleared ' . $fees_before . ' existing fees');
+    // Verify the fee was added by the hook
+    $fees_after_hook = WC()->cart->get_fees();
+    error_log('WPP: AJAX - Fees after hook calculation: ' . count($fees_after_hook));
 
-      // Add priority fee if enabled
-      if ($priority) {
-        $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
-        $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
+    // **FALLBACK: If hook didn't work, add fee manually and protect it**
+    if ($priority && count($fees_after_hook) === 0) {
+      error_log('WPP: AJAX - Hook failed, adding fee manually');
 
-        error_log('WPP: AJAX - Adding fee: ' . $fee_label . ' = ' . $fee_amount);
+      // Add the fee
+      WC()->cart->add_fee($fee_label, $fee_amount, true);
 
-        if ($fee_amount > 0) {
-          WC()->cart->add_fee($fee_label, $fee_amount, true);
-          error_log('WPP: AJAX - Fee added successfully');
-        }
-      } else {
-        error_log('WPP: AJAX - Priority false, no fee added');
-      }
+      // **CRITICAL: Prevent calculate_totals from clearing our fee**
+      // We'll temporarily remove the fee calculation hook
+      remove_action('woocommerce_cart_calculate_fees', [$this, 'add_priority_fee']);
 
-      // Recalculate totals
-      WC()->cart->calculate_fees();
+      // Calculate totals without fee hooks interfering
       WC()->cart->calculate_totals();
 
-      // Verify final state
-      $final_fees = WC()->cart->get_fees();
-      error_log('WPP: AJAX - Final fee count: ' . count($final_fees));
-      foreach ($final_fees as $fee) {
-        error_log('WPP: AJAX - Final fee: ' . $fee->name . ' = ' . $fee->amount);
-      }
+      // Re-add the hook for future use
+      add_action('woocommerce_cart_calculate_fees', [$this, 'add_priority_fee']);
+
+      error_log('WPP: AJAX - Manual fee added and protected from clearing');
     } else {
-      error_log('WPP: AJAX - No cart available');
+      // Normal calculation with hooks
+      WC()->cart->calculate_totals();
+      error_log('WPP: AJAX - Normal totals calculation completed');
     }
 
-    // Generate checkout fragments
+    // **Final verification**
+    $final_fees = WC()->cart->get_fees();
+    $fee_count = count($final_fees);
+    $stored_priority = WC()->session->get('priority_processing', 'ERROR');
+    $cart_total = WC()->cart->get_total('edit');
+
+    error_log('WPP: AJAX - Final verification:');
+    error_log('WPP: AJAX - Stored priority: ' . var_export($stored_priority, true));
+    error_log('WPP: AJAX - Fee count: ' . $fee_count);
+    error_log('WPP: AJAX - Cart total: ' . $cart_total);
+
+    foreach ($final_fees as $fee) {
+      error_log('WPP: AJAX - Final fee: ' . $fee->name . ' = ' . $fee->amount);
+    }
+
+    // **Generate fresh fragments**
     ob_start();
     woocommerce_order_review();
-    $order_review = ob_get_clean();
+    $checkout_review = ob_get_clean();
 
     $fragments = [
-      '.woocommerce-checkout-review-order-table' => $order_review
+      '.woocommerce-checkout-review-order-table' => $checkout_review
     ];
 
-    error_log('WPP: AJAX - Sending success response');
-
-    wp_send_json_success([
+    $response_data = [
       'fragments' => $fragments,
       'priority' => $priority,
       'debug' => [
         'stored_priority' => $stored_priority,
-        'fee_count' => WC()->cart ? count(WC()->cart->get_fees()) : 0,
-        'session_id' => WC()->session ? WC()->session->get_customer_id() : 'none'
+        'fee_count' => $fee_count,
+        'session_id' => WC()->session->get_customer_id(),
+        'cart_total' => $cart_total,
+        'fees_added' => $priority && $fee_amount > 0
       ]
-    ]);
+    ];
+
+    error_log('WPP: AJAX - Sending success response');
+    wp_send_json_success($response_data);
   }
 
   public function add_priority_fee()
   {
     // Only run on checkout and if enabled
     if (!is_checkout() || (get_option('wpp_enabled') !== 'yes' && get_option('wpp_enabled') !== '1')) {
-      error_log('WPP: Fee calculation skipped - not checkout or plugin disabled');
       return;
     }
 
     if (!WC()->session) {
-      error_log('WPP: Fee calculation skipped - no WC session');
+      error_log('WPP: Fee hook - No session available');
       return;
     }
 
     $priority = WC()->session->get('priority_processing', false);
 
-    // Enhanced debugging
-    error_log('WPP: Fee calculation hook - Priority state: ' . var_export($priority, true));
-    error_log('WPP: Fee calculation hook - Session ID: ' . WC()->session->get_customer_id());
+    // **CRITICAL: More flexible priority checking**
+    $is_priority_enabled = ($priority === true || $priority === 1 || $priority === '1');
 
-    // Debug all session data
-    $all_session_data = WC()->session->get_session_data();
-    error_log('WPP: All session data: ' . print_r($all_session_data, true));
-
-    // FIXED: Handle WooCommerce session storage quirks
-    // WooCommerce stores false as empty string, so we need proper comparison
-    $is_priority_enabled = ($priority === true || $priority === '1' || $priority === 1);
-
-    error_log('WPP: Is priority enabled: ' . ($is_priority_enabled ? 'YES' : 'NO'));
+    error_log('WPP: Fee hook - Priority state: ' . var_export($priority, true) . ', enabled: ' . ($is_priority_enabled ? 'YES' : 'NO'));
 
     // Add fee if priority is enabled
     if ($is_priority_enabled) {
       $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
       $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
-      // Check if fee already exists to avoid duplicates
+      // **IMPROVED: More thorough duplicate check**
       $existing_fees = WC()->cart->get_fees();
       $fee_exists = false;
 
+      error_log('WPP: Fee hook - Checking ' . count($existing_fees) . ' existing fees');
       foreach ($existing_fees as $fee) {
-        if ($fee->name === $fee_label) {
+        error_log('WPP: Fee hook - Existing fee: "' . $fee->name . '" vs "' . $fee_label . '"');
+        if ($fee->name === $fee_label || strpos($fee->name, 'Priority') !== false) {
           $fee_exists = true;
-          error_log('WPP: Fee already exists, skipping: ' . $fee->name);
+          error_log('WPP: Fee hook - Found matching fee, skipping');
           break;
         }
       }
 
       if (!$fee_exists && $fee_amount > 0) {
         WC()->cart->add_fee($fee_label, $fee_amount, true);
-        error_log('WPP: Added priority fee: ' . $fee_amount);
+        error_log('WPP: Fee hook - Added priority fee: ' . $fee_amount);
+
+        // **VERIFY IT WAS ADDED IMMEDIATELY**
+        $post_add_fees = WC()->cart->get_fees();
+        error_log('WPP: Fee hook - Post-add fee count: ' . count($post_add_fees));
+      } else if ($fee_exists) {
+        error_log('WPP: Fee hook - Fee already exists, not adding');
+      } else {
+        error_log('WPP: Fee hook - Fee amount is 0, not adding');
       }
     } else {
-      error_log('WPP: Priority disabled, empty, or false - no fee will be added by hook');
+      error_log('WPP: Fee hook - Priority disabled, not adding fee');
     }
   }
 
@@ -370,7 +349,7 @@ class WPP_Frontend
     }
 
     $priority = WC()->session->get('priority_processing', false);
-    if ($priority === true || $priority === '1') {
+    if ($priority === true) {
       $order->update_meta_data('_priority_processing', 'yes');
       $order->save_meta_data();
       error_log('WPP: Priority saved to order: ' . $order->get_id());
