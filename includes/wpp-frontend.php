@@ -243,6 +243,7 @@ class WPP_Frontend
         // **ADD CHECKBOX ROW HERE TO PRESERVE IT**
         $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
         $section_title = get_option('wpp_section_title', 'Express Options');
+        $description = get_option('wpp_description', '');
         ?>
         <tr class="wpp-priority-row">
           <td colspan="2" style="border-top: 2px solid #e0e0e0; padding: 15px 0 10px 0;">
@@ -259,6 +260,11 @@ class WPP_Frontend
                     <?php echo esc_html($checkbox_label); ?>
                     <span style="color: #dc3545;">(+<?php echo wc_price($fee_amount); ?>)</span>
                   </strong>
+                  <?php if ($description): ?>
+                    <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
+                      <?php echo esc_html($description); ?>
+                    </small>
+                  <?php endif; ?>
                 </span>
               </label>
             </div>
