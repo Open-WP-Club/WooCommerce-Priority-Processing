@@ -293,11 +293,6 @@ class WPP_Frontend
 
   public function add_priority_fee()
   {
-    // Skip during AJAX - we handle display manually
-    if (defined('DOING_AJAX') && DOING_AJAX) {
-      return;
-    }
-
     if (!is_checkout() || (get_option('wpp_enabled') !== 'yes' && get_option('wpp_enabled') !== '1')) {
       return;
     }
@@ -313,7 +308,18 @@ class WPP_Frontend
       $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
       $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
-      if ($fee_amount > 0) {
+      // Check if fee already exists to avoid duplicates
+      $existing_fees = WC()->cart->get_fees();
+      $fee_exists = false;
+
+      foreach ($existing_fees as $fee) {
+        if ($fee->name === $fee_label) {
+          $fee_exists = true;
+          break;
+        }
+      }
+
+      if (!$fee_exists && $fee_amount > 0) {
         WC()->cart->add_fee($fee_label, $fee_amount);
       }
     }
@@ -327,8 +333,30 @@ class WPP_Frontend
 
     $priority = WC()->session->get('priority_processing', false);
     if ($priority === true || $priority === 1 || $priority === '1') {
+      // Save priority meta data
       $order->update_meta_data('_priority_processing', 'yes');
-      $order->save_meta_data();
+
+      // **Add the fee to the actual order**
+      $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+      $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
+
+      if ($fee_amount > 0) {
+        // Create fee item for the order
+        $item = new WC_Order_Item_Fee();
+        $item->set_name($fee_label);
+        $item->set_amount($fee_amount);
+        $item->set_tax_class('');
+        $item->set_tax_status('taxable');
+        $item->set_total($fee_amount);
+
+        // Add the fee item to order
+        $order->add_item($item);
+
+        // Recalculate order totals
+        $order->calculate_totals();
+      }
+
+      $order->save();
     }
   }
 }
