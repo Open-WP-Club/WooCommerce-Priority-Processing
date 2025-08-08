@@ -78,7 +78,7 @@ class WPP_Frontend
             <span>
               <strong style="color: #28a745;">
                 <?php echo esc_html($checkbox_label); ?>
-                <span style="color: #dc3545;">(+<?php echo wc_price($fee_amount); ?>)</span>
+                <span style="color: #dc3545;">(+ <?php echo wc_price($fee_amount); ?>)</span>
               </strong>
               <?php if ($description): ?>
                 <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
@@ -246,7 +246,7 @@ class WPP_Frontend
                 <span>
                   <strong style="color: #28a745;">
                     <?php echo esc_html($checkbox_label); ?>
-                    <span style="color: #dc3545;">(+<?php echo wc_price($fee_amount); ?>)</span>
+                    <span style="color: #dc3545;">(+ <?php echo wc_price($fee_amount); ?>)</span>
                   </strong>
                   <?php if ($description): ?>
                     <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
