@@ -73,9 +73,6 @@ class WPP_Admin
     $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
     $description = get_option('wpp_description', 'Your order will be processed with priority and shipped via express delivery');
     $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
-
-    // Get currency symbol
-    $currency_symbol = function_exists('get_woocommerce_currency_symbol') ? get_woocommerce_currency_symbol() : '$';
 ?>
     <div class="wrap wpp-admin-container">
       <h1><?php _e('Priority Processing Settings', 'woo-priority'); ?></h1>
@@ -121,11 +118,8 @@ class WPP_Admin
                     <label for="wpp_fee_amount"><?php _e('Additional Fee', 'woo-priority'); ?></label>
                   </th>
                   <td>
-                    <div class="wpp-currency-wrapper">
-                      <span class="wpp-currency-symbol"><?php echo esc_html($currency_symbol); ?></span>
-                      <input type="number" step="0.01" min="0" id="wpp_fee_amount" name="wpp_fee_amount"
-                        value="<?php echo esc_attr($fee_amount); ?>" />
-                    </div>
+                    <input type="number" step="0.01" min="0" id="wpp_fee_amount" name="wpp_fee_amount"
+                      value="<?php echo esc_attr($fee_amount); ?>" />
                     <p class="description"><?php _e('Amount to charge for priority processing and express shipping', 'woo-priority'); ?></p>
                   </td>
                 </tr>
@@ -201,7 +195,7 @@ class WPP_Admin
 
           <div class="wpp-quick-stats">
             <div class="wpp-stat-item">
-              <span class="wpp-stat-value"><?php echo esc_html($currency_symbol . $fee_amount); ?></span>
+              <span class="wpp-stat-value"><?php echo esc_html($fee_amount); ?></span>
               <span class="wpp-stat-label"><?php _e('Current Fee', 'woo-priority'); ?></span>
             </div>
             <div class="wpp-stat-item">
@@ -218,7 +212,7 @@ class WPP_Admin
               <input type="checkbox" disabled <?php echo ($enabled === '1') ? '' : 'style="opacity: 0.5;"'; ?> />
               <span>
                 <strong id="preview-checkbox-label"><?php echo esc_html($checkbox_label); ?></strong>
-                <span class="preview-price">(+<span id="preview-fee-amount"><?php echo esc_html($currency_symbol . $fee_amount); ?></span>)</span>
+                <span class="preview-price">( + <span id="preview-fee-amount"><?php echo esc_html($fee_amount); ?></span>)</span>
                 <?php if ($description): ?>
                   <small class="preview-description" id="preview-description"><?php echo esc_html($description); ?></small>
                 <?php endif; ?>
@@ -252,11 +246,10 @@ class WPP_Admin
           var description = $('#wpp_description').val() || '';
           var feeAmount = $('#wpp_fee_amount').val() || '0.00';
           var enabled = $('#wpp_enabled').is(':checked');
-          var currencySymbol = '<?php echo esc_js($currency_symbol); ?>';
 
           $('#preview-section-title').text(sectionTitle);
           $('#preview-checkbox-label').text(checkboxLabel);
-          $('#preview-fee-amount').text(currencySymbol + feeAmount);
+          $('#preview-fee-amount').text(feeAmount);
 
           if (description) {
             $('#preview-description').text(description).show();
@@ -284,14 +277,39 @@ class WPP_Admin
             $status.removeClass('wpp-status-enabled').addClass('wpp-status-disabled').text('Inactive');
           }
 
-          // Update stats
-          $('.wpp-stat-value').first().text(currencySymbol + feeAmount);
+          // Update stats - only show numbers
+          $('.wpp-stat-value').first().text(feeAmount);
           $('.wpp-stat-value').last().text(enabled ? '✅' : '❌');
         }
 
         // Bind events for live preview
         $('#wpp_section_title, #wpp_checkbox_label, #wpp_description, #wpp_fee_amount').on('input', updatePreview);
         $('#wpp_enabled').on('change', updatePreview);
+
+        // Force immediate update on page load to clean any cached content
+        setTimeout(function() {
+          updatePreview();
+          // Force clean the stat value specifically
+          var currentFee = $('#wpp_fee_amount').val() || '0.00';
+          $('.wpp-stat-value').first().text(currentFee);
+
+          // Clean any HTML entities that might be lingering
+          $('#preview-fee-amount').text(currentFee);
+
+          // Extra cleanup - remove any HTML entities from all text elements
+          $('[id*="preview-"]').each(function() {
+            var $el = $(this);
+            var text = $el.text();
+            if (text.indexOf('&#') !== -1) {
+              // If it contains HTML entities, clean it based on element type
+              if ($el.attr('id') === 'preview-fee-amount') {
+                $el.text(currentFee);
+              } else {
+                $el.text(text.replace(/&#\d+;/g, ''));
+              }
+            }
+          });
+        }, 100);
 
         // Initial preview update
         updatePreview();
