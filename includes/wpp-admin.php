@@ -86,13 +86,13 @@ class WPP_Admin
       <div class="wpp-settings-grid">
         <!-- Main Settings Panel -->
         <div class="wpp-settings-card">
-          <h2>⚙️ <?php _e('Configuration', 'woo-priority'); ?></h2>
+          <h2><?php _e('Configuration', 'woo-priority'); ?></h2>
 
           <form method="post" action="options.php" id="wpp-settings-form">
             <?php settings_fields('wpp_settings'); ?>
 
             <div class="wpp-feature-section">
-              <div class="wpp-feature-title">🔧 <?php _e('Basic Settings', 'woo-priority'); ?></div>
+              <div class="wpp-feature-title"><?php _e('Basic Settings', 'woo-priority'); ?></div>
 
               <table class="form-table">
                 <tr>
@@ -127,7 +127,7 @@ class WPP_Admin
             </div>
 
             <div class="wpp-feature-section">
-              <div class="wpp-feature-title">🎨 <?php _e('Display Settings', 'woo-priority'); ?></div>
+              <div class="wpp-feature-title"><?php _e('Display Settings', 'woo-priority'); ?></div>
 
               <table class="form-table">
                 <tr>
@@ -177,21 +177,11 @@ class WPP_Admin
 
             <?php submit_button(__('Save Changes', 'woo-priority'), 'primary', 'submit', false); ?>
           </form>
-
-          <div class="wpp-help-section">
-            <h4>💡 <?php _e('Quick Tips', 'woo-priority'); ?></h4>
-            <ul>
-              <li><?php _e('Set competitive but profitable fee amounts based on your fulfillment costs', 'woo-priority'); ?></li>
-              <li><?php _e('Use clear, benefit-focused language in your checkbox label', 'woo-priority'); ?></li>
-              <li><?php _e('Keep descriptions concise but informative about delivery timeframes', 'woo-priority'); ?></li>
-              <li><?php _e('Priority orders are automatically marked with ⚡ in your admin area', 'woo-priority'); ?></li>
-            </ul>
-          </div>
         </div>
 
         <!-- Preview Panel -->
         <div class="wpp-preview-card">
-          <h3>👁️ <?php _e('Live Preview', 'woo-priority'); ?></h3>
+          <h3><?php _e('Live Preview', 'woo-priority'); ?></h3>
 
           <div class="wpp-quick-stats">
             <div class="wpp-stat-item">
@@ -212,7 +202,7 @@ class WPP_Admin
               <input type="checkbox" disabled <?php echo ($enabled === '1') ? '' : 'style="opacity: 0.5;"'; ?> />
               <span>
                 <strong id="preview-checkbox-label"><?php echo esc_html($checkbox_label); ?></strong>
-                <span class="preview-price">( + <span id="preview-fee-amount"><?php echo esc_html($fee_amount); ?></span>)</span>
+                <span class="preview-price">(+<span id="preview-fee-amount"><?php echo esc_html($fee_amount); ?></span>)</span>
                 <?php if ($description): ?>
                   <small class="preview-description" id="preview-description"><?php echo esc_html($description); ?></small>
                 <?php endif; ?>
@@ -221,10 +211,20 @@ class WPP_Admin
           </div>
 
           <div style="margin-top: 20px;">
-            <h4>📊 <?php _e('Order Management', 'woo-priority'); ?></h4>
+            <h4><?php _e('Order Management', 'woo-priority'); ?></h4>
             <p style="font-size: 13px; color: #646970; line-height: 1.4;">
               <?php _e('Priority orders will be clearly marked with ⚡ lightning bolts in your order list and individual order pages for easy identification.', 'woo-priority'); ?>
             </p>
+          </div>
+
+          <div class="wpp-help-section">
+            <h4>💡 <?php _e('Quick Tips', 'woo-priority'); ?></h4>
+            <ul>
+              <li><?php _e('Set competitive but profitable fee amounts based on your fulfillment costs', 'woo-priority'); ?></li>
+              <li><?php _e('Use clear, benefit-focused language in your checkbox label', 'woo-priority'); ?></li>
+              <li><?php _e('Keep descriptions concise but informative about delivery timeframes', 'woo-priority'); ?></li>
+              <li><?php _e('Priority orders are automatically marked with ⚡ in your admin area', 'woo-priority'); ?></li>
+            </ul>
           </div>
 
           <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
