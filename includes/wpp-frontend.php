@@ -2,6 +2,9 @@
 
 class WPP_Frontend
 {
+  private static $fee_added_this_request = false;
+  private static $session_manager_initialized = false;
+
   public function __construct()
   {
     // Classic WooCommerce checkout hooks
@@ -22,28 +25,123 @@ class WPP_Frontend
     add_action('woocommerce_cart_calculate_fees', [$this, 'add_priority_fee']);
     add_action('woocommerce_checkout_create_order', [$this, 'save_priority_to_order'], 10, 2);
 
-    // Clear priority session when order is completed
+    // Enhanced session clearing hooks
     add_action('woocommerce_thankyou', [$this, 'clear_priority_session']);
     add_action('woocommerce_cart_emptied', [$this, 'clear_priority_session']);
+    add_action('wp_logout', [$this, 'clear_priority_session']);
+    add_action('woocommerce_checkout_order_processed', [$this, 'clear_priority_session']);
+
+    // Clear on payment failure/cancellation
+    add_action('woocommerce_checkout_order_review', [$this, 'validate_session_state']);
+
+    // Reset fee tracking on new requests
+    add_action('init', [$this, 'reset_request_tracking']);
 
     // Initialize session properly
     add_action('init', [$this, 'init_session']);
   }
 
+  /**
+   * Reset per-request tracking variables
+   */
+  public function reset_request_tracking()
+  {
+    self::$fee_added_this_request = false;
+  }
+
+  /**
+   * Initialize session with better error handling
+   */
   public function init_session()
   {
-    if (!is_admin() && !defined('DOING_AJAX')) {
+    if (!is_admin() && !defined('DOING_AJAX') && !self::$session_manager_initialized) {
       if (WC()->session && !WC()->session->has_session()) {
-        WC()->session->set_customer_session_cookie(true);
+        try {
+          WC()->session->set_customer_session_cookie(true);
+          self::$session_manager_initialized = true;
+        } catch (Exception $e) {
+          error_log('WPP: Session initialization failed: ' . $e->getMessage());
+        }
       }
     }
   }
 
+  /**
+   * Centralized session management for priority processing
+   */
+  private function get_priority_session_state()
+  {
+    if (!WC()->session) {
+      return false;
+    }
+
+    try {
+      $session_priority = WC()->session->get('priority_processing', false);
+      return ($session_priority === true || $session_priority === '1' || $session_priority === 1);
+    } catch (Exception $e) {
+      error_log('WPP: Error reading session state: ' . $e->getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Set priority session state with error handling
+   */
+  private function set_priority_session_state($state)
+  {
+    if (!WC()->session) {
+      error_log('WPP: Cannot set session state - WC session not available');
+      return false;
+    }
+
+    try {
+      WC()->session->set('priority_processing', $state);
+      return true;
+    } catch (Exception $e) {
+      error_log('WPP: Error setting session state: ' . $e->getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Validate and repair session state if needed
+   */
+  public function validate_session_state()
+  {
+    if (!is_checkout()) {
+      return;
+    }
+
+    // If we're on checkout but session is somehow lost, reset everything
+    if (WC()->session && !WC()->session->has_session()) {
+      $this->init_session();
+    }
+  }
+
+  /**
+   * Enhanced session clearing with multiple fallbacks
+   */
   public function clear_priority_session($order_id = null)
   {
+    // Clear WooCommerce session
     if (WC()->session) {
-      WC()->session->set('priority_processing', false);
+      try {
+        WC()->session->set('priority_processing', false);
+        WC()->session->set('wpp_last_state', null);
+      } catch (Exception $e) {
+        error_log('WPP: Error clearing WC session: ' . $e->getMessage());
+      }
     }
+
+    // Clear any persistent user meta if user is logged in
+    if (is_user_logged_in()) {
+      delete_user_meta(get_current_user_id(), '_wpp_priority_processing');
+    }
+
+    // Reset request-level tracking
+    self::$fee_added_this_request = false;
+
+    error_log('WPP: Priority session cleared' . ($order_id ? ' for order #' . $order_id : ''));
   }
 
   public function add_priority_checkbox()
@@ -57,12 +155,8 @@ class WPP_Frontend
     $description = get_option('wpp_description', '');
     $section_title = get_option('wpp_section_title', 'Express Options');
 
-    // Simple session check
-    $is_checked = false;
-    if (WC()->session) {
-      $session_priority = WC()->session->get('priority_processing', false);
-      $is_checked = ($session_priority === true || $session_priority === '1' || $session_priority === 1);
-    }
+    // Use centralized session management
+    $is_checked = $this->get_priority_session_state();
 
 ?>
     <tr class="wpp-priority-row">
@@ -104,12 +198,8 @@ class WPP_Frontend
     $description = get_option('wpp_description', '');
     $section_title = get_option('wpp_section_title', 'Express Options');
 
-    // Simple session check
-    $is_checked = false;
-    if (WC()->session) {
-      $session_priority = WC()->session->get('priority_processing', false);
-      $is_checked = ($session_priority === true || $session_priority === '1' || $session_priority === 1);
-    }
+    // Use centralized session management
+    $is_checked = $this->get_priority_session_state();
 
   ?>
     <div id="wpp-priority-option-fallback" style="margin: 20px 0; padding: 15px; background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 4px;">
@@ -171,15 +261,26 @@ class WPP_Frontend
     }
   }
 
+  /**
+   * Enhanced AJAX handler with better error recovery
+   */
   public function ajax_update_priority()
   {
+    // Verify nonce
     if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wpp_nonce')) {
-      wp_send_json_error('Invalid nonce');
+      wp_send_json_error([
+        'message' => 'Invalid nonce',
+        'action' => 'reload_page'
+      ]);
       return;
     }
 
+    // Check WooCommerce session
     if (!WC()->session) {
-      wp_send_json_error('WooCommerce session not available');
+      wp_send_json_error([
+        'message' => 'WooCommerce session not available',
+        'action' => 'reload_page'
+      ]);
       return;
     }
 
@@ -187,20 +288,69 @@ class WPP_Frontend
     $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
     $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
-    // Store in session for final order processing
-    WC()->session->set('priority_processing', $priority);
+    // Store previous state for rollback
+    $previous_state = $this->get_priority_session_state();
 
-    // Generate custom checkout HTML with calculated totals
+    // Attempt to set new session state
+    if (!$this->set_priority_session_state($priority)) {
+      wp_send_json_error([
+        'message' => 'Failed to update session state',
+        'action' => 'rollback',
+        'previous_state' => $previous_state
+      ]);
+      return;
+    }
+
+    // Store state for validation
+    if (WC()->session) {
+      WC()->session->set('wpp_last_state', $priority);
+    }
+
+    // Generate updated checkout HTML
+    try {
+      $cart_subtotal = WC()->cart->get_subtotal();
+      $cart_tax = WC()->cart->get_total_tax();
+      $shipping_total = WC()->cart->get_shipping_total();
+
+      // Calculate new total with or without priority fee
+      $priority_fee_amount = $priority ? $fee_amount : 0;
+      $new_total = $cart_subtotal + $cart_tax + $shipping_total + $priority_fee_amount;
+
+      ob_start();
+      $this->render_checkout_table($priority, $priority_fee_amount, $fee_label);
+      $checkout_html = ob_get_clean();
+
+      wp_send_json_success([
+        'fragments' => ['.woocommerce-checkout-review-order-table' => $checkout_html],
+        'debug' => [
+          'priority' => $priority,
+          'fee_amount' => $priority_fee_amount,
+          'new_total' => wc_price($new_total),
+          'session_set' => true
+        ]
+      ]);
+    } catch (Exception $e) {
+      // Rollback session state on any error
+      $this->set_priority_session_state($previous_state);
+
+      wp_send_json_error([
+        'message' => 'Error generating checkout: ' . $e->getMessage(),
+        'action' => 'rollback',
+        'previous_state' => $previous_state
+      ]);
+    }
+  }
+
+  /**
+   * Render checkout table - extracted for reusability
+   */
+  private function render_checkout_table($priority, $priority_fee_amount, $fee_label)
+  {
     $cart_subtotal = WC()->cart->get_subtotal();
     $cart_tax = WC()->cart->get_total_tax();
     $shipping_total = WC()->cart->get_shipping_total();
-
-    // Calculate new total with or without priority fee
-    $priority_fee_amount = $priority ? $fee_amount : 0;
     $new_total = $cart_subtotal + $cart_tax + $shipping_total + $priority_fee_amount;
 
-    // Generate custom checkout HTML with our calculated totals
-    ob_start();
   ?>
     <table class="shop_table woocommerce-checkout-review-order-table">
       <thead>
@@ -229,35 +379,8 @@ class WPP_Frontend
         }
 
         // Add checkbox row to preserve it
-        $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
-        $section_title = get_option('wpp_section_title', 'Express Options');
-        $description = get_option('wpp_description', '');
+        $this->render_checkbox_row($priority);
         ?>
-        <tr class="wpp-priority-row">
-          <td colspan="2" style="border-top: 2px solid #e0e0e0; padding: 15px 0 10px 0;">
-            <div id="wpp-priority-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6;">
-              <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">
-                ⚡ <?php echo esc_html($section_title); ?>
-              </h4>
-              <label style="display: flex; align-items: flex-start; cursor: pointer; font-size: 14px;">
-                <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox"
-                  name="priority_processing" value="1" <?php checked($priority, true); ?>
-                  style="margin-right: 10px; margin-top: 2px; transform: scale(1.1);" />
-                <span>
-                  <strong style="color: #28a745;">
-                    <?php echo esc_html($checkbox_label); ?>
-                    <span style="color: #dc3545;">( + <?php echo wc_price($fee_amount); ?>)</span>
-                  </strong>
-                  <?php if ($description): ?>
-                    <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
-                      <?php echo esc_html($description); ?>
-                    </small>
-                  <?php endif; ?>
-                </span>
-              </label>
-            </div>
-          </td>
-        </tr>
       </tbody>
       <tfoot>
         <tr class="cart-subtotal">
@@ -278,19 +401,50 @@ class WPP_Frontend
         </tr>
       </tfoot>
     </table>
-<?php
-    $checkout_html = ob_get_clean();
-
-    wp_send_json_success([
-      'fragments' => ['.woocommerce-checkout-review-order-table' => $checkout_html],
-      'debug' => [
-        'priority' => $priority,
-        'fee_amount' => $priority_fee_amount,
-        'new_total' => wc_price($new_total)
-      ]
-    ]);
+  <?php
   }
 
+  /**
+   * Render checkbox row - extracted for reusability
+   */
+  private function render_checkbox_row($priority)
+  {
+    $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
+    $section_title = get_option('wpp_section_title', 'Express Options');
+    $description = get_option('wpp_description', '');
+    $fee_amount = get_option('wpp_fee_amount', '5.00');
+  ?>
+    <tr class="wpp-priority-row">
+      <td colspan="2" style="border-top: 2px solid #e0e0e0; padding: 15px 0 10px 0;">
+        <div id="wpp-priority-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6;">
+          <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">
+            ⚡ <?php echo esc_html($section_title); ?>
+          </h4>
+          <label style="display: flex; align-items: flex-start; cursor: pointer; font-size: 14px;">
+            <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox"
+              name="priority_processing" value="1" <?php checked($priority, true); ?>
+              style="margin-right: 10px; margin-top: 2px; transform: scale(1.1);" />
+            <span>
+              <strong style="color: #28a745;">
+                <?php echo esc_html($checkbox_label); ?>
+                <span style="color: #dc3545;">( + <?php echo wc_price($fee_amount); ?>)</span>
+              </strong>
+              <?php if ($description): ?>
+                <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
+                  <?php echo esc_html($description); ?>
+                </small>
+              <?php endif; ?>
+            </span>
+          </label>
+        </div>
+      </td>
+    </tr>
+<?php
+  }
+
+  /**
+   * Enhanced fee addition with duplicate prevention
+   */
   public function add_priority_fee()
   {
     if (!is_checkout() || (get_option('wpp_enabled') !== 'yes' && get_option('wpp_enabled') !== '1')) {
@@ -301,56 +455,74 @@ class WPP_Frontend
       return;
     }
 
-    $priority = WC()->session->get('priority_processing', false);
-    $should_add_fee = ($priority === true || $priority === 1 || $priority === '1');
+    // Prevent multiple fee additions in the same request
+    if (self::$fee_added_this_request) {
+      return;
+    }
 
-    if ($should_add_fee) {
+    $priority = $this->get_priority_session_state();
+
+    if ($priority) {
       $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
       $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
-      // Check if fee already exists to avoid duplicates
-      $existing_fees = WC()->cart->get_fees();
-      $fee_exists = false;
+      if ($fee_amount > 0) {
+        // Enhanced duplicate check
+        $existing_fees = WC()->cart->get_fees();
+        $fee_exists = false;
 
-      foreach ($existing_fees as $fee) {
-        if ($fee->name === $fee_label) {
-          $fee_exists = true;
-          break;
+        foreach ($existing_fees as $fee) {
+          if ($fee->name === $fee_label || strpos($fee->name, 'Priority') !== false) {
+            $fee_exists = true;
+            break;
+          }
         }
-      }
 
-      if (!$fee_exists && $fee_amount > 0) {
-        WC()->cart->add_fee($fee_label, $fee_amount);
+        if (!$fee_exists) {
+          WC()->cart->add_fee($fee_label, $fee_amount);
+          self::$fee_added_this_request = true;
+        }
       }
     }
   }
 
+  /**
+   * Enhanced order saving with validation
+   */
   public function save_priority_to_order($order, $data)
   {
     if (!WC()->session) {
       return;
     }
 
-    $priority = WC()->session->get('priority_processing', false);
-    if ($priority === true || $priority === 1 || $priority === '1') {
-      // Save priority meta data only - WooCommerce handles fee transfer automatically
-      $order->update_meta_data('_priority_processing', 'yes');
+    $priority = $this->get_priority_session_state();
 
-      // Check if order already has the priority processing fee from this plugin
+    if ($priority) {
+      // Validate that the session state matches what we expect
+      $last_state = WC()->session->get('wpp_last_state', null);
+      if ($last_state !== null && $last_state !== $priority) {
+        error_log('WPP: Session state mismatch detected during order creation');
+      }
+
+      // Save priority meta data
+      $order->update_meta_data('_priority_processing', 'yes');
+      $order->update_meta_data('_wpp_session_state', $priority ? 'yes' : 'no');
+      $order->update_meta_data('_wpp_fee_applied', self::$fee_added_this_request ? 'yes' : 'no');
+
+      // Verify fee exists in order
       $order_fees = $order->get_fees();
       $priority_fee_exists = false;
       $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
 
       foreach ($order_fees as $fee) {
-        if ($fee->get_name() === $fee_label) {
+        if ($fee->get_name() === $fee_label || strpos($fee->get_name(), 'Priority') !== false) {
           $priority_fee_exists = true;
-          error_log('WPP: Priority fee already exists in order: ' . $fee->get_name());
           break;
         }
       }
 
-      if ($priority_fee_exists) {
-        error_log('WPP: WARNING - Priority fee already found in order #' . $order->get_id());
+      if (!$priority_fee_exists) {
+        error_log('WPP: WARNING - Priority order created but no fee found in order #' . $order->get_id());
       }
 
       $order->save();
