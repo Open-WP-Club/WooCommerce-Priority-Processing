@@ -4,23 +4,22 @@ class WPP_Admin
 {
   public function __construct()
   {
-    // Try WooCommerce integration first
-    add_action('woocommerce_loaded', [$this, 'init_woocommerce_settings']);
-
-    // Fallback: Create separate admin page if WooCommerce integration fails
-    add_action('admin_menu', [$this, 'add_fallback_admin_menu']);
+    // Always add the admin menu as primary approach
+    add_action('admin_menu', [$this, 'add_admin_menu']);
     add_action('admin_init', [$this, 'register_settings']);
     add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
+
+    // Try WooCommerce integration as secondary approach
+    add_action('woocommerce_loaded', [$this, 'try_woocommerce_integration']);
   }
 
-  public function init_woocommerce_settings()
+  public function try_woocommerce_integration()
   {
-    // Only load WooCommerce settings integration if WC_Settings_Page exists
-    if (class_exists('WC_Settings_Page')) {
+    // Only try if WC_Settings_Page exists and we haven't already integrated
+    if (class_exists('WC_Settings_Page') && !get_transient('wpp_wc_integration_attempted')) {
       add_filter('woocommerce_get_settings_pages', [$this, 'add_woocommerce_settings_page']);
-      error_log('WPP: WooCommerce settings integration loaded');
-    } else {
-      error_log('WPP: WC_Settings_Page not available, using fallback admin page');
+      set_transient('wpp_wc_integration_attempted', true, HOUR_IN_SECONDS);
+      error_log('WPP: WooCommerce settings integration attempted');
     }
   }
 
@@ -28,7 +27,10 @@ class WPP_Admin
   {
     // Include and create the settings page class
     if (!class_exists('WPP_WooCommerce_Settings')) {
-      include_once WPP_PLUGIN_DIR . 'includes/wpp-wc-settings.php';
+      $settings_file = WPP_PLUGIN_DIR . 'includes/wpp-wc-settings.php';
+      if (file_exists($settings_file)) {
+        include_once $settings_file;
+      }
     }
 
     if (class_exists('WPP_WooCommerce_Settings')) {
@@ -39,9 +41,9 @@ class WPP_Admin
     return $settings;
   }
 
-  public function add_fallback_admin_menu()
+  public function add_admin_menu()
   {
-    // Only add fallback menu if we're not successfully integrated with WooCommerce
+    // Always add as WooCommerce submenu - this is reliable
     add_submenu_page(
       'woocommerce',
       __('Priority Processing', 'woo-priority'),
@@ -300,14 +302,14 @@ class WPP_Admin
 
   public function admin_scripts($hook)
   {
-    // Load styles on WooCommerce settings page when our tab is active
-    if ($hook === 'woocommerce_page_wc-settings' && isset($_GET['tab']) && $_GET['tab'] === 'wpp_priority') {
+    // Load styles on our admin page
+    if ($hook === 'woocommerce_page_woo-priority-processing') {
       wp_enqueue_style('wpp-admin', WPP_PLUGIN_URL . 'assets/admin.css', [], WPP_VERSION);
       wp_enqueue_script('jquery');
     }
 
-    // Also load on fallback admin page
-    if ($hook === 'woocommerce_page_woo-priority-processing') {
+    // Also load on WooCommerce settings page if our tab is active
+    if ($hook === 'woocommerce_page_wc-settings' && isset($_GET['tab']) && $_GET['tab'] === 'wpp_priority') {
       wp_enqueue_style('wpp-admin', WPP_PLUGIN_URL . 'assets/admin.css', [], WPP_VERSION);
       wp_enqueue_script('jquery');
     }
