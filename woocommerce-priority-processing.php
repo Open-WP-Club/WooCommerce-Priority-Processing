@@ -3,7 +3,7 @@
 /**
  * Plugin Name: WooCommerce Priority Processing
  * Description: Add priority processing and express shipping option at checkout
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: OpenWPClub.com
  * Author URI: https://openwpclub.com
  * License: GPL v2 or later
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WPP_VERSION', '1.0.2');
+define('WPP_VERSION', '1.0.3');
 define('WPP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPP_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -32,6 +32,7 @@ add_action('before_woocommerce_init', function () {
 });
 
 // Include class files
+require_once WPP_PLUGIN_DIR . 'includes/wpp-statistics.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-admin.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-frontend.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-orders.php';
@@ -43,6 +44,7 @@ class WooCommerce_Priority_Processing
   public $admin;
   public $frontend;
   public $orders;
+  public $statistics;
 
   public static function instance()
   {
@@ -66,7 +68,8 @@ class WooCommerce_Priority_Processing
 
   private function init()
   {
-    // Initialize components
+    // Initialize components in proper order
+    $this->statistics = new WPP_Statistics();
     $this->admin = new WPP_Admin();
     $this->frontend = new WPP_Frontend();
     $this->orders = new WPP_Orders();
@@ -77,6 +80,10 @@ class WooCommerce_Priority_Processing
     // Add cleanup hooks
     add_action('woocommerce_cart_emptied', [$this, 'clear_priority_session']);
     add_action('wp_logout', [$this, 'clear_priority_session']);
+
+    // Plugin lifecycle hooks
+    register_activation_hook(__FILE__, [$this, 'on_activation']);
+    register_deactivation_hook(__FILE__, [$this, 'on_deactivation']);
   }
 
   public function woocommerce_missing_notice()
@@ -125,6 +132,62 @@ class WooCommerce_Priority_Processing
       error_log('WPP: Priority session cleared by main class');
     }
   }
+
+  /**
+   * Plugin activation
+   */
+  public function on_activation()
+  {
+    // Create default options
+    add_option('wpp_enabled', '0');
+    add_option('wpp_fee_amount', '5.00');
+    add_option('wpp_checkbox_label', __('Priority processing + Express shipping', 'woo-priority'));
+    add_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
+    add_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
+    add_option('wpp_section_title', __('Express Options', 'woo-priority'));
+
+    // Optionally schedule daily statistics refresh
+    if ($this->statistics) {
+      $this->statistics->schedule_daily_refresh();
+    }
+
+    error_log('WPP: Plugin activated successfully');
+  }
+
+  /**
+   * Plugin deactivation
+   */
+  public function on_deactivation()
+  {
+    // Clear any sessions
+    if (class_exists('WooCommerce') && WC()->session) {
+      WC()->session->set('priority_processing', false);
+    }
+
+    // Clear statistics cache
+    if ($this->statistics) {
+      $this->statistics->clear_cache();
+      $this->statistics->cleanup_scheduled_events();
+    }
+
+    error_log('WPP: Plugin deactivated and cleaned up');
+  }
+
+  /**
+   * Get statistics instance
+   */
+  public function get_statistics()
+  {
+    return $this->statistics;
+  }
+
+  /**
+   * Get admin instance
+   */
+  public function get_admin()
+  {
+    return $this->admin;
+  }
 }
 
 // Initialize plugin
@@ -132,10 +195,10 @@ add_action('plugins_loaded', function () {
   WooCommerce_Priority_Processing::instance();
 });
 
-// Activation hook
+// Legacy activation/deactivation hooks (for backward compatibility)
 register_activation_hook(__FILE__, function () {
   // Create default options
-  add_option('wpp_enabled', '1');
+  add_option('wpp_enabled', '0');
   add_option('wpp_fee_amount', '5.00');
   add_option('wpp_checkbox_label', __('Priority processing + Express shipping', 'woo-priority'));
   add_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
@@ -143,7 +206,6 @@ register_activation_hook(__FILE__, function () {
   add_option('wpp_section_title', __('Express Options', 'woo-priority'));
 });
 
-// Deactivation hook
 register_deactivation_hook(__FILE__, function () {
   // Clear any sessions
   if (class_exists('WooCommerce') && WC()->session) {

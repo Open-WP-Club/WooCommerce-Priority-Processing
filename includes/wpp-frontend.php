@@ -66,15 +66,16 @@ class WPP_Frontend
 
 ?>
     <tr class="wpp-priority-row">
-      <td colspan="2" style="border-top: 2px solid #e0e0e0; padding: 15px 0 10px 0;">
+      <td colspan="2" style="padding: 15px 0 10px 0;">
         <div id="wpp-priority-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6;">
-          <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">
+          <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px; float: left;">
             ⚡ <?php echo esc_html($section_title); ?>
           </h4>
-          <label style="display: flex; align-items: flex-start; cursor: pointer; font-size: 14px;">
+          <div style="clear: both;"></div>
+          <label style="cursor: pointer; font-size: 14px;">
             <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox"
               name="priority_processing" value="1" <?php checked($is_checked, true); ?>
-              style="margin-right: 10px; margin-top: 2px; transform: scale(1.1);" />
+              style="margin-right: 10px; vertical-align: top; transform: scale(1.1);" />
             <span>
               <strong style="color: #28a745;">
                 <?php echo esc_html($checkbox_label); ?>
@@ -112,13 +113,14 @@ class WPP_Frontend
     }
 
   ?>
-    <div id="wpp-priority-option-fallback" style="margin: 20px 0; padding: 15px; background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 4px;">
-      <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">
+    <div id="wpp-priority-option-fallback" style="margin: 20px 0; padding: 15px; background: #f7f7f7; border-radius: 4px;">
+      <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px; float: left;">
         ⚡ <?php echo esc_html($section_title); ?>
       </h4>
-      <label style="display: flex; align-items: flex-start; cursor: pointer;">
+      <div style="clear: both;"></div>
+      <label style="cursor: pointer;">
         <input type="checkbox" id="wpp_priority_checkbox_fallback" class="wpp-priority-checkbox" name="priority_processing" value="1"
-          <?php checked($is_checked, true); ?> style="margin-right: 8px; margin-top: 2px;" />
+          <?php checked($is_checked, true); ?> style="margin-right: 8px; vertical-align: top;" />
         <span>
           <strong><?php echo esc_html($checkbox_label); ?>:
             <?php echo wc_price($fee_amount); ?></strong>
@@ -234,15 +236,16 @@ class WPP_Frontend
         $description = get_option('wpp_description', '');
         ?>
         <tr class="wpp-priority-row">
-          <td colspan="2" style="border-top: 2px solid #e0e0e0; padding: 15px 0 10px 0;">
+          <td colspan="2" style="padding: 15px 0 10px 0;">
             <div id="wpp-priority-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6;">
-              <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">
+              <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px; float: left;">
                 ⚡ <?php echo esc_html($section_title); ?>
               </h4>
-              <label style="display: flex; align-items: flex-start; cursor: pointer; font-size: 14px;">
+              <div style="clear: both;"></div>
+              <label style="cursor: pointer; font-size: 14px;">
                 <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox"
                   name="priority_processing" value="1" <?php checked($priority, true); ?>
-                  style="margin-right: 10px; margin-top: 2px; transform: scale(1.1);" />
+                  style="margin-right: 10px; vertical-align: top; transform: scale(1.1);" />
                 <span>
                   <strong style="color: #28a745;">
                     <?php echo esc_html($checkbox_label); ?>

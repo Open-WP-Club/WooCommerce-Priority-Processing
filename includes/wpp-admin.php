@@ -2,12 +2,17 @@
 
 class WPP_Admin
 {
+  private $statistics;
+
   public function __construct()
   {
     // Always add the admin menu as primary approach
     add_action('admin_menu', [$this, 'add_admin_menu']);
     add_action('admin_init', [$this, 'register_settings']);
     add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
+
+    // Initialize statistics handler
+    $this->statistics = new WPP_Statistics();
 
     // Try WooCommerce integration as secondary approach
     add_action('woocommerce_loaded', [$this, 'try_woocommerce_integration']);
@@ -73,6 +78,10 @@ class WPP_Admin
     $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
     $description = get_option('wpp_description', 'Your order will be processed with priority and shipped via express delivery');
     $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
+
+    // Get statistics from the statistics handler
+    $stats = $this->statistics->get_statistics();
+    $cache_info = $this->statistics->get_cache_info();
 ?>
     <div class="wrap wpp-admin-container">
       <h1><?php _e('Priority Processing Settings', 'woo-priority'); ?></h1>
@@ -82,6 +91,96 @@ class WPP_Admin
           <p><strong><?php _e('Settings saved successfully!', 'woo-priority'); ?></strong> <?php _e('Your priority processing options are now active.', 'woo-priority'); ?></p>
         </div>
       <?php endif; ?>
+
+      <!-- Statistics Section -->
+      <div class="wpp-statistics-section">
+        <div class="wpp-statistics-header">
+          <h2><?php _e('📊 Priority Processing Statistics', 'woo-priority'); ?></h2>
+          <div class="wpp-stats-controls">
+            <span class="wpp-cache-info">
+              <?php if ($cache_info['is_cached']): ?>
+                <small><?php printf(__('Cached for %d hours', 'woo-priority'), $cache_info['cache_duration_hours']); ?></small>
+              <?php else: ?>
+                <small><?php _e('Live data', 'woo-priority'); ?></small>
+              <?php endif; ?>
+            </span>
+            <button type="button" id="wpp-refresh-stats" class="button button-secondary">
+              <span class="dashicons dashicons-update"></span>
+              <?php _e('Refresh Stats', 'woo-priority'); ?>
+            </button>
+          </div>
+        </div>
+
+        <div class="wpp-statistics-grid" id="wpp-statistics-container">
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">⚡</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-total-orders"><?php echo number_format($stats['total_priority_orders']); ?></div>
+              <div class="wpp-stat-label"><?php _e('Total Priority Orders', 'woo-priority'); ?></div>
+            </div>
+          </div>
+
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">💰</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-total-revenue"><?php echo wc_price($stats['total_priority_revenue']); ?></div>
+              <div class="wpp-stat-label"><?php _e('Total Priority Revenue', 'woo-priority'); ?></div>
+            </div>
+          </div>
+
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">📈</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-percentage"><?php echo $stats['priority_percentage']; ?>%</div>
+              <div class="wpp-stat-label"><?php _e('Priority Rate', 'woo-priority'); ?></div>
+            </div>
+          </div>
+
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">💵</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-avg-fee"><?php echo wc_price($stats['average_priority_fee']); ?></div>
+              <div class="wpp-stat-label"><?php _e('Average Fee', 'woo-priority'); ?></div>
+            </div>
+          </div>
+
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">📅</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-today"><?php echo number_format($stats['today_priority_orders']); ?></div>
+              <div class="wpp-stat-label"><?php _e('Today', 'woo-priority'); ?></div>
+            </div>
+          </div>
+
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">📊</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-this-week"><?php echo number_format($stats['this_week_priority_orders']); ?></div>
+              <div class="wpp-stat-label"><?php _e('This Week', 'woo-priority'); ?></div>
+            </div>
+          </div>
+
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">📆</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-this-month"><?php echo number_format($stats['this_month_priority_orders']); ?></div>
+              <div class="wpp-stat-label"><?php _e('This Month', 'woo-priority'); ?></div>
+            </div>
+          </div>
+
+          <div class="wpp-stat-card">
+            <div class="wpp-stat-icon">🔄</div>
+            <div class="wpp-stat-content">
+              <div class="wpp-stat-value" id="stat-last-updated"><?php echo esc_html(gmdate('H:i', strtotime($stats['last_updated']))); ?></div>
+              <div class="wpp-stat-label"><?php _e('Last Updated', 'woo-priority'); ?></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wpp-statistics-note">
+          <p><strong><?php _e('Note:', 'woo-priority'); ?></strong> <?php _e('Statistics are cached for 24 hours to improve performance. Click "Refresh Stats" to get the latest data.', 'woo-priority'); ?></p>
+        </div>
+      </div>
 
       <div class="wpp-settings-grid">
         <!-- Main Settings Panel -->
@@ -313,6 +412,71 @@ class WPP_Admin
 
         // Initial preview update
         updatePreview();
+
+        // Statistics refresh handler
+        $('#wpp-refresh-stats').on('click', function(e) {
+          e.preventDefault();
+
+          var $button = $(this);
+          var originalText = $button.html();
+
+          // Show loading state
+          $button.prop('disabled', true);
+          $button.html('<span class="dashicons dashicons-update spin"></span> ' + wpp_admin_ajax.refreshing_text);
+
+          // Add loading class to statistics container
+          $('#wpp-statistics-container').addClass('wpp-loading');
+
+          $.ajax({
+            url: wpp_admin_ajax.ajax_url,
+            type: 'POST',
+            data: {
+              action: 'wpp_refresh_stats',
+              nonce: wpp_admin_ajax.nonce
+            },
+            success: function(response) {
+              if (response.success && response.data.formatted) {
+                // Update all statistics with formatted values
+                $('#stat-total-orders').text(response.data.formatted.total_priority_orders);
+                $('#stat-total-revenue').html(response.data.formatted.total_priority_revenue);
+                $('#stat-percentage').text(response.data.formatted.priority_percentage);
+                $('#stat-avg-fee').html(response.data.formatted.average_priority_fee);
+                $('#stat-today').text(response.data.formatted.today_priority_orders);
+                $('#stat-this-week').text(response.data.formatted.this_week_priority_orders);
+                $('#stat-this-month').text(response.data.formatted.this_month_priority_orders);
+
+                // Update last updated time
+                var now = new Date();
+                var timeString = now.getHours().toString().padStart(2, '0') + ':' +
+                  now.getMinutes().toString().padStart(2, '0');
+                $('#stat-last-updated').text(timeString);
+
+                // Show success feedback
+                $('#wpp-statistics-container').addClass('wpp-updated');
+                setTimeout(function() {
+                  $('#wpp-statistics-container').removeClass('wpp-updated');
+                }, 2000);
+
+                // Show success message if provided
+                if (response.data.message) {
+                  console.log('WPP: ' + response.data.message);
+                }
+              } else {
+                alert('Failed to refresh statistics. Please try again.');
+              }
+            },
+            error: function(xhr, status, error) {
+              console.error('Statistics refresh error:', error);
+              alert('Error refreshing statistics: ' + error);
+            },
+            complete: function() {
+              // Reset button state
+              $button.prop('disabled', false);
+              $button.html(originalText);
+              $('#wpp-statistics-container').removeClass('wpp-loading');
+            }
+          });
+        });
       });
     </script>
 <?php
@@ -324,6 +488,14 @@ class WPP_Admin
     if ($hook === 'woocommerce_page_woo-priority-processing') {
       wp_enqueue_style('wpp-admin', WPP_PLUGIN_URL . 'assets/admin.css', [], WPP_VERSION);
       wp_enqueue_script('jquery');
+
+      // Localize script for AJAX
+      wp_localize_script('jquery', 'wpp_admin_ajax', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('wpp_admin_nonce'),
+        'refreshing_text' => __('Refreshing...', 'woo-priority'),
+        'refresh_text' => __('Refresh Stats', 'woo-priority')
+      ]);
     }
 
     // Also load on WooCommerce settings page if our tab is active
@@ -331,5 +503,13 @@ class WPP_Admin
       wp_enqueue_style('wpp-admin', WPP_PLUGIN_URL . 'assets/admin.css', [], WPP_VERSION);
       wp_enqueue_script('jquery');
     }
+  }
+
+  /**
+   * Get the statistics handler instance
+   */
+  public function get_statistics_handler()
+  {
+    return $this->statistics;
   }
 }
