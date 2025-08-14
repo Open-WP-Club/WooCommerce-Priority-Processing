@@ -12,14 +12,14 @@ class WPP_Permissions
   public static function get_allowed_user_roles()
   {
     $allowed_roles = get_option('wpp_allowed_user_roles', ['customer']);
-
+    
     // Ensure it's always an array
     if (!is_array($allowed_roles)) {
       $allowed_roles = !empty($allowed_roles) ? [$allowed_roles] : ['customer'];
       // Fix the option in database to prevent future issues
       update_option('wpp_allowed_user_roles', $allowed_roles);
     }
-
+    
     return $allowed_roles;
   }
 
@@ -64,7 +64,7 @@ class WPP_Permissions
   public static function get_available_user_roles()
   {
     global $wp_roles;
-
+    
     if (!isset($wp_roles)) {
       $wp_roles = new WP_Roles();
     }
@@ -87,12 +87,12 @@ class WPP_Permissions
   {
     $allowed_roles = self::get_allowed_user_roles();
     $allow_guests = get_option('wpp_allow_guests', '1');
-
+    
     $summary = [];
-
+    
     // Always include shop managers
     $summary[] = __('Shop Managers', 'woo-priority');
-
+    
     // Add selected roles
     $available_roles = self::get_available_user_roles();
     foreach ($allowed_roles as $role_key) {
@@ -100,12 +100,12 @@ class WPP_Permissions
         $summary[] = $available_roles[$role_key];
       }
     }
-
+    
     // Add guests if allowed
     if ($allow_guests === '1') {
       $summary[] = __('Guest Users', 'woo-priority');
     }
-
+    
     return $summary;
   }
 
@@ -118,14 +118,14 @@ class WPP_Permissions
       return;
     }
 
-    $user_info = is_user_logged_in() ?
+    $user_info = is_user_logged_in() ? 
       'User ID: ' . get_current_user_id() . ', Roles: ' . implode(', ', wp_get_current_user()->roles) :
       'Guest user';
-
+    
     $allowed_roles = self::get_allowed_user_roles();
     $allow_guests = get_option('wpp_allow_guests', '1');
     $has_access = self::can_access_priority_processing();
-
+    
     error_log("WPP Permission Check [{$context}]: {$user_info} | Allowed roles: " . implode(', ', $allowed_roles) . " | Allow guests: {$allow_guests} | Access granted: " . ($has_access ? 'YES' : 'NO'));
   }
 

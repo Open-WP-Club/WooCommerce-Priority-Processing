@@ -16,6 +16,10 @@ class WPP_Admin
 
     // Try WooCommerce integration as secondary approach
     add_action('woocommerce_loaded', [$this, 'try_woocommerce_integration']);
+
+    // Order admin functionality
+    add_action('add_meta_boxes', [$this, 'add_order_meta_box']);
+    add_action('wp_ajax_wpp_toggle_order_priority', [$this, 'ajax_toggle_order_priority']);
   }
 
   public function try_woocommerce_integration()
@@ -122,6 +126,42 @@ class WPP_Admin
           <p><strong><?php _e('Settings saved successfully!', 'woo-priority'); ?></strong> <?php _e('Your priority processing options are now active.', 'woo-priority'); ?></p>
         </div>
       <?php endif; ?>
+
+      <!-- New Feature Notification -->
+      <div class="notice notice-info" style="border-left-color: #667eea;">
+        <h3 style="margin: 0.5em 0;">📞 <?php _e('New: Admin Priority Processing', 'woo-priority'); ?></h3>
+        <p>
+          <strong><?php _e('You can now add priority processing to any order directly from the admin panel!', 'woo-priority'); ?></strong><br>
+          <?php _e('Perfect for phone orders and customer service. Look for the', 'woo-priority'); ?> <strong>⚡ <?php _e('Priority Processing', 'woo-priority'); ?></strong> <?php _e('box when editing any order.', 'woo-priority'); ?>
+        </p>
+        <p>
+          <a href="<?php echo admin_url('edit.php?post_type=shop_order'); ?>" class="button button-secondary">
+            <?php _e('📋 Go to Orders', 'woo-priority'); ?>
+          </a>
+          <a href="#admin-priority-guide" class="button button-link" onclick="jQuery('#admin-priority-guide').toggle(); return false;">
+            <?php _e('📖 Learn More', 'woo-priority'); ?>
+          </a>
+        </p>
+
+        <div id="admin-priority-guide" style="display: none; background: #f9f9f9; padding: 15px; border-radius: 4px; margin-top: 10px;">
+          <h4><?php _e('🚀 Quick Start:', 'woo-priority'); ?></h4>
+          <ol>
+            <li><?php _e('Go to any order in WooCommerce → Orders', 'woo-priority'); ?></li>
+            <li><?php _e('Look for the "Priority Processing" box in the sidebar', 'woo-priority'); ?></li>
+            <li><?php _e('Click "Add Priority Processing" to instantly upgrade any order', 'woo-priority'); ?></li>
+            <li><?php _e('Perfect for phone orders and customer service requests!', 'woo-priority'); ?></li>
+          </ol>
+
+          <h4><?php _e('✨ Features:', 'woo-priority'); ?></h4>
+          <ul>
+            <li>✅ <?php _e('One-click priority processing addition/removal', 'woo-priority'); ?></li>
+            <li>✅ <?php _e('Automatic fee calculation and order total updates', 'woo-priority'); ?></li>
+            <li>✅ <?php _e('Full audit trail with order notes', 'woo-priority'); ?></li>
+            <li>✅ <?php _e('Works with all order statuses (except completed/cancelled)', 'woo-priority'); ?></li>
+            <li>✅ <?php _e('Admin and shop manager access only', 'woo-priority'); ?></li>
+          </ul>
+        </div>
+      </div>
 
       <!-- Statistics Section -->
       <div class="wpp-statistics-section">
@@ -257,7 +297,7 @@ class WPP_Admin
             </div>
 
             <div class="wpp-feature-section">
-              <div class="wpp-feature-title"><?php _e('User Permissions', 'woo-priority'); ?></div>
+              <div class="wpp-feature-title"><?php _e('🔐 User Permissions', 'woo-priority'); ?></div>
 
               <table class="form-table">
                 <tr>
@@ -662,7 +702,7 @@ class WPP_Admin
         });
       });
     </script>
-<?php
+  <?php
   }
 
   public function admin_scripts($hook)
@@ -686,6 +726,82 @@ class WPP_Admin
       wp_enqueue_style('wpp-admin', WPP_PLUGIN_URL . 'assets/admin.css', [], WPP_VERSION);
       wp_enqueue_script('jquery');
     }
+
+    // Load scripts for order edit pages
+    global $post_type;
+    $screen = get_current_screen();
+
+    // Traditional order pages or HPOS order pages
+    if (
+      ($post_type === 'shop_order') ||
+      ($screen && $screen->id === wc_get_page_screen_id('shop-order')) ||
+      ($screen && strpos($screen->id, 'shop_order') !== false)
+    ) {
+      // Enqueue admin styles for order pages
+      wp_enqueue_style('wpp-admin-order', WPP_PLUGIN_URL . 'assets/admin.css', [], WPP_VERSION);
+      wp_enqueue_script('jquery');
+
+      // Add inline styles for meta box
+      wp_add_inline_style('wpp-admin-order', '
+        #wpp_order_priority .inside {
+          padding: 12px !important;
+        }
+        
+        #wpp_order_priority h2 {
+          font-size: 14px !important;
+          padding: 8px 12px !important;
+          margin: 0 !important;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+          color: white !important;
+        }
+        
+        #wpp-order-priority-container .notice {
+          margin: 0 0 10px 0 !important;
+        }
+        
+        .wpp-priority-actions .button {
+          text-decoration: none !important;
+          box-shadow: none !important;
+          transition: all 0.2s ease;
+        }
+        
+        .wpp-priority-actions .button:hover {
+          transform: translateY(-1px);
+        }
+        
+        #wpp-add-priority {
+          background: #28a745 !important;
+          border-color: #28a745 !important;
+          color: white !important;
+        }
+        
+        #wpp-add-priority:hover {
+          background: #218838 !important;
+          border-color: #1e7e34 !important;
+        }
+        
+        #wpp-remove-priority {
+          background: #dc3545 !important;
+          border-color: #dc3545 !important;
+          color: white !important;
+        }
+        
+        #wpp-remove-priority:hover {
+          background: #c82333 !important;
+          border-color: #bd2130 !important;
+        }
+        
+        @keyframes wpp-pulse {
+          0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+          70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        
+        .wpp-priority-actions .button.wpp-pulse {
+          animation: wpp-pulse 2s infinite;
+        }
+      ');
+    }
   }
 
   /**
@@ -694,5 +810,360 @@ class WPP_Admin
   public function get_statistics_handler()
   {
     return $this->statistics;
+  }
+
+  /**
+   * Add priority processing meta box to order edit page
+   */
+  public function add_order_meta_box()
+  {
+    // Traditional post-based orders
+    add_meta_box(
+      'wpp_order_priority',
+      __('⚡ Priority Processing', 'woo-priority'),
+      [$this, 'order_priority_meta_box'],
+      'shop_order',
+      'side',
+      'high'
+    );
+
+    // HPOS orders
+    if (class_exists('\Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController')) {
+      add_meta_box(
+        'wpp_order_priority',
+        __('⚡ Priority Processing', 'woo-priority'),
+        [$this, 'order_priority_meta_box'],
+        wc_get_page_screen_id('shop-order'),
+        'side',
+        'high'
+      );
+    }
+  }
+
+  /**
+   * Display the priority processing meta box
+   */
+  public function order_priority_meta_box($post_or_order)
+  {
+    // Get order object
+    $order = ($post_or_order instanceof WP_Post) ? wc_get_order($post_or_order->ID) : $post_or_order;
+
+    if (!$order) {
+      return;
+    }
+
+    $order_id = $order->get_id();
+    $has_priority = $order->get_meta('_priority_processing') === 'yes';
+    $fee_amount = get_option('wpp_fee_amount', '5.00');
+    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
+
+    // Check if order already has priority fee
+    $existing_fee = null;
+    foreach ($order->get_fees() as $fee) {
+      if (strpos($fee->get_name(), 'Priority') !== false || $fee->get_name() === $fee_label) {
+        $existing_fee = $fee;
+        break;
+      }
+    }
+
+    $order_status = $order->get_status();
+    $can_modify = !in_array($order_status, ['completed', 'refunded', 'cancelled']);
+
+    wp_nonce_field('wpp_order_priority_nonce', 'wpp_order_priority_nonce');
+  ?>
+
+    <div id="wpp-order-priority-container">
+      <div class="wpp-priority-status" style="margin-bottom: 15px;">
+        <?php if ($has_priority): ?>
+          <div style="background: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+            <strong>✅ <?php _e('Priority Processing Active', 'woo-priority'); ?></strong>
+            <?php if ($existing_fee): ?>
+              <br><small><?php printf(__('Fee: %s'), wc_price($existing_fee->get_total())); ?></small>
+            <?php endif; ?>
+          </div>
+        <?php else: ?>
+          <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+            <strong>❌ <?php _e('Standard Processing', 'woo-priority'); ?></strong>
+          </div>
+        <?php endif; ?>
+      </div>
+
+      <?php if ($can_modify): ?>
+        <div class="wpp-priority-actions">
+          <?php if ($has_priority): ?>
+            <button type="button" id="wpp-remove-priority" class="button button-secondary"
+              data-order-id="<?php echo $order_id; ?>"
+              style="width: 100%; margin-bottom: 10px; color: #721c24;">
+              <span class="dashicons dashicons-minus-alt" style="vertical-align: middle;"></span>
+              <?php _e('Remove Priority Processing', 'woo-priority'); ?>
+            </button>
+          <?php else: ?>
+            <button type="button" id="wpp-add-priority" class="button button-primary"
+              data-order-id="<?php echo $order_id; ?>"
+              style="width: 100%; margin-bottom: 10px;">
+              <span class="dashicons dashicons-plus-alt" style="vertical-align: middle;"></span>
+              <?php _e('Add Priority Processing', 'woo-priority'); ?>
+            </button>
+          <?php endif; ?>
+
+          <div id="wpp-priority-info" style="background: #e7f3ff; border: 1px solid #b3d9ff; padding: 8px; border-radius: 4px; font-size: 12px;">
+            <?php if (!$has_priority): ?>
+              <strong><?php _e('This will:', 'woo-priority'); ?></strong>
+              <ul style="margin: 5px 0 0 15px; padding: 0;">
+                <li><?php printf(__('Add %s fee', 'woo-priority'), wc_price($fee_amount)); ?></li>
+                <li><?php _e('Mark order as priority', 'woo-priority'); ?></li>
+                <li><?php _e('Recalculate order totals', 'woo-priority'); ?></li>
+                <li><?php _e('Add order note', 'woo-priority'); ?></li>
+              </ul>
+            <?php else: ?>
+              <strong><?php _e('This will:', 'woo-priority'); ?></strong>
+              <ul style="margin: 5px 0 0 15px; padding: 0;">
+                <li><?php _e('Remove priority fee', 'woo-priority'); ?></li>
+                <li><?php _e('Remove priority status', 'woo-priority'); ?></li>
+                <li><?php _e('Recalculate order totals', 'woo-priority'); ?></li>
+                <li><?php _e('Add order note', 'woo-priority'); ?></li>
+              </ul>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php else: ?>
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; color: #856404; font-size: 12px;">
+          <strong><?php _e('Cannot modify:', 'woo-priority'); ?></strong><br>
+          <?php _e('Order status does not allow modifications', 'woo-priority'); ?>
+        </div>
+      <?php endif; ?>
+
+      <div id="wpp-loading" style="display: none; text-align: center; padding: 20px;">
+        <span class="spinner is-active" style="float: none; margin: 0;"></span>
+        <div style="margin-top: 10px;"><?php _e('Processing...', 'woo-priority'); ?></div>
+      </div>
+    </div>
+
+    <script>
+      jQuery(document).ready(function($) {
+        $('#wpp-add-priority, #wpp-remove-priority').on('click', function(e) {
+          e.preventDefault();
+
+          var $button = $(this);
+          var orderId = $button.data('order-id');
+          var isAdding = $button.attr('id') === 'wpp-add-priority';
+          var action = isAdding ? 'add' : 'remove';
+
+          // Show loading state
+          $('#wpp-loading').show();
+          $('#wpp-order-priority-container .wpp-priority-actions').hide();
+
+          // Confirm action
+          var confirmMsg = isAdding ?
+            '<?php echo esc_js(__("Add priority processing to this order? This will add the fee and recalculate totals.", "woo-priority")); ?>' :
+            '<?php echo esc_js(__("Remove priority processing from this order? This will remove the fee and recalculate totals.", "woo-priority")); ?>';
+
+          if (!confirm(confirmMsg)) {
+            $('#wpp-loading').hide();
+            $('#wpp-order-priority-container .wpp-priority-actions').show();
+            return;
+          }
+
+          // Send AJAX request
+          $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+              action: 'wpp_toggle_order_priority',
+              order_id: orderId,
+              priority_action: action,
+              nonce: $('#wpp_order_priority_nonce').val()
+            },
+            success: function(response) {
+              if (response.success) {
+                // Show success message
+                var message = '<div style="background: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; padding: 10px; border-radius: 4px; margin: 10px 0;">' +
+                  '<strong>✅ ' + response.data.message + '</strong></div>';
+
+                $('#wpp-order-priority-container').prepend(message);
+
+                // Refresh the page after a short delay to show updated order
+                setTimeout(function() {
+                  window.location.reload();
+                }, 1500);
+
+              } else {
+                alert('<?php echo esc_js(__("Error:", "woo-priority")); ?> ' + (response.data || '<?php echo esc_js(__("Unknown error occurred", "woo-priority")); ?>'));
+                $('#wpp-loading').hide();
+                $('#wpp-order-priority-container .wpp-priority-actions').show();
+              }
+            },
+            error: function(xhr, status, error) {
+              alert('<?php echo esc_js(__("Connection error. Please try again.", "woo-priority")); ?>');
+              $('#wpp-loading').hide();
+              $('#wpp-order-priority-container .wpp-priority-actions').show();
+            }
+          });
+        });
+      });
+    </script>
+
+    <style>
+      #wpp-order-priority-container .button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      #wpp-order-priority-container .dashicons {
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      #wpp-order-priority-container ul {
+        list-style-type: disc;
+      }
+    </style>
+<?php
+  }
+
+  /**
+   * AJAX handler for toggling order priority
+   */
+  public function ajax_toggle_order_priority()
+  {
+    // Security checks
+    if (!current_user_can('manage_woocommerce')) {
+      wp_send_json_error(__('Permission denied', 'woo-priority'));
+      return;
+    }
+
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wpp_order_priority_nonce')) {
+      wp_send_json_error(__('Invalid nonce', 'woo-priority'));
+      return;
+    }
+
+    $order_id = intval($_POST['order_id'] ?? 0);
+    $action = sanitize_text_field($_POST['priority_action'] ?? '');
+
+    if (!$order_id || !in_array($action, ['add', 'remove'])) {
+      wp_send_json_error(__('Invalid parameters', 'woo-priority'));
+      return;
+    }
+
+    $order = wc_get_order($order_id);
+    if (!$order) {
+      wp_send_json_error(__('Order not found', 'woo-priority'));
+      return;
+    }
+
+    // Check if order can be modified
+    $order_status = $order->get_status();
+    if (in_array($order_status, ['completed', 'refunded', 'cancelled'])) {
+      wp_send_json_error(__('Cannot modify this order status', 'woo-priority'));
+      return;
+    }
+
+    try {
+      $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+      $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
+      $current_user = wp_get_current_user();
+
+      if ($action === 'add') {
+        // Add priority processing
+
+        // Check if already has priority
+        if ($order->get_meta('_priority_processing') === 'yes') {
+          wp_send_json_error(__('Order already has priority processing', 'woo-priority'));
+          return;
+        }
+
+        // Add priority meta
+        $order->update_meta_data('_priority_processing', 'yes');
+
+        // Add fee if not exists
+        $existing_fee = null;
+        foreach ($order->get_fees() as $fee) {
+          if (strpos($fee->get_name(), 'Priority') !== false || $fee->get_name() === $fee_label) {
+            $existing_fee = $fee;
+            break;
+          }
+        }
+
+        if (!$existing_fee && $fee_amount > 0) {
+          $fee = new WC_Order_Item_Fee();
+          $fee->set_name($fee_label);
+          $fee->set_amount($fee_amount);
+          $fee->set_total($fee_amount);
+          $fee->set_order_id($order_id);
+          $order->add_item($fee);
+        }
+
+        // Add order note
+        $order->add_order_note(
+          sprintf(
+            __('Priority processing added by %s. Fee: %s', 'woo-priority'),
+            $current_user->display_name,
+            wc_price($fee_amount)
+          ),
+          false
+        );
+
+        $message = __('Priority processing added successfully!', 'woo-priority');
+      } else {
+        // Remove priority processing
+
+        // Remove priority meta
+        $order->delete_meta_data('_priority_processing');
+
+        // Remove priority fee
+        $fees_to_remove = [];
+        foreach ($order->get_fees() as $fee_id => $fee) {
+          if (strpos($fee->get_name(), 'Priority') !== false || $fee->get_name() === $fee_label) {
+            $fees_to_remove[] = $fee_id;
+          }
+        }
+
+        foreach ($fees_to_remove as $fee_id) {
+          $order->remove_item($fee_id);
+        }
+
+        // Add order note
+        $order->add_order_note(
+          sprintf(
+            __('Priority processing removed by %s', 'woo-priority'),
+            $current_user->display_name
+          ),
+          false
+        );
+
+        $message = __('Priority processing removed successfully!', 'woo-priority');
+      }
+
+      // Recalculate totals
+      $order->calculate_totals();
+      $order->save();
+
+      // Clear any caches
+      if (function_exists('wc_delete_shop_order_transients')) {
+        wc_delete_shop_order_transients($order_id);
+      }
+
+      // Trigger action for other plugins
+      do_action('wpp_order_priority_toggled', $order_id, $action, $current_user->ID);
+
+      // Clear statistics cache to ensure updated counts
+      if ($this->statistics) {
+        $this->statistics->clear_cache();
+      }
+
+      error_log("WPP: Priority processing {$action}ed for order #{$order_id} by user {$current_user->display_name}");
+
+      wp_send_json_success([
+        'message' => $message,
+        'order_id' => $order_id,
+        'action' => $action,
+        'new_total' => $order->get_formatted_order_total()
+      ]);
+    } catch (Exception $e) {
+      error_log('WPP Order Priority Toggle Error: ' . $e->getMessage());
+      wp_send_json_error(__('An error occurred while updating the order', 'woo-priority'));
+    }
   }
 }

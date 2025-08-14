@@ -3,7 +3,7 @@
 /**
  * Plugin Name: WooCommerce Priority Processing
  * Description: Add priority processing and express shipping option at checkout
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: OpenWPClub.com
  * Author URI: https://openwpclub.com
  * License: GPL v2 or later
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WPP_VERSION', '1.1.0');
+define('WPP_VERSION', '1.1.1');
 define('WPP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPP_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -35,6 +35,7 @@ add_action('before_woocommerce_init', function () {
 require_once WPP_PLUGIN_DIR . 'includes/wpp-permissions.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-statistics.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-admin.php';
+require_once WPP_PLUGIN_DIR . 'includes/wpp-order-admin.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-frontend.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-orders.php';
 
@@ -43,6 +44,7 @@ class WooCommerce_Priority_Processing
   private static $instance = null;
 
   public $admin;
+  public $order_admin;
   public $frontend;
   public $orders;
   public $statistics;
@@ -72,6 +74,7 @@ class WooCommerce_Priority_Processing
     // Initialize components in proper order
     $this->statistics = new WPP_Statistics();
     $this->admin = new WPP_Admin();
+    $this->order_admin = new WPP_Order_Admin();
     $this->frontend = new WPP_Frontend();
     $this->orders = new WPP_Orders();
 
@@ -227,6 +230,14 @@ class WooCommerce_Priority_Processing
   public function get_admin()
   {
     return $this->admin;
+  }
+
+  /**
+   * Get order admin instance
+   */
+  public function get_order_admin()
+  {
+    return $this->order_admin;
   }
 }
 
