@@ -73,24 +73,18 @@ class WPP_Frontend
 ?>
     <tr class="wpp-priority-row">
       <td colspan="2" style="padding: 15px 0 10px 0;">
-        <div id="wpp-priority-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6;">
-          <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px; float: left;">
-            ⚡ <?php echo esc_html($section_title); ?>
-          </h4>
-          <div style="clear: both;"></div>
-          <label style="cursor: pointer; font-size: 14px;">
+        <div id="wpp-priority-section">
+          <h4>⚡ <?php echo esc_html($section_title); ?></h4>
+          <label>
             <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox"
-              name="priority_processing" value="1" <?php checked($is_checked, true); ?>
-              style="margin-right: 10px; vertical-align: top; transform: scale(1.1);" />
+              name="priority_processing" value="1" <?php checked($is_checked, true); ?> />
             <span>
-              <strong style="color: #28a745;">
+              <strong>
                 <?php echo esc_html($checkbox_label); ?>
-                <span style="color: #dc3545;">( + <?php echo wc_price($fee_amount); ?>)</span>
+                <span class="wpp-price">( + <?php echo wc_price($fee_amount); ?>)</span>
               </strong>
               <?php if ($description): ?>
-                <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
-                  <?php echo esc_html($description); ?>
-                </small>
+                <small><?php echo esc_html($description); ?></small>
               <?php endif; ?>
             </span>
           </label>
@@ -125,21 +119,18 @@ class WPP_Frontend
     }
 
   ?>
-    <div id="wpp-priority-option-fallback" style="margin: 20px 0; padding: 15px; background: #f7f7f7; border-radius: 4px;">
-      <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px; float: left;">
-        ⚡ <?php echo esc_html($section_title); ?>
-      </h4>
-      <div style="clear: both;"></div>
-      <label style="cursor: pointer;">
-        <input type="checkbox" id="wpp_priority_checkbox_fallback" class="wpp-priority-checkbox" name="priority_processing" value="1"
-          <?php checked($is_checked, true); ?> style="margin-right: 8px; vertical-align: top;" />
+    <div id="wpp-priority-option-fallback">
+      <h4>⚡ <?php echo esc_html($section_title); ?></h4>
+      <label>
+        <input type="checkbox" id="wpp_priority_checkbox_fallback" class="wpp-priority-checkbox"
+          name="priority_processing" value="1" <?php checked($is_checked, true); ?> />
         <span>
-          <strong><?php echo esc_html($checkbox_label); ?>:
-            <?php echo wc_price($fee_amount); ?></strong>
+          <strong>
+            <?php echo esc_html($checkbox_label); ?>:
+            <span class="wpp-price"><?php echo wc_price($fee_amount); ?></span>
+          </strong>
           <?php if ($description): ?>
-            <br><small style="color: #666; display: block; margin-top: 4px;">
-              <?php echo esc_html($description); ?>
-            </small>
+            <small><?php echo esc_html($description); ?></small>
           <?php endif; ?>
         </span>
       </label>
@@ -158,6 +149,14 @@ class WPP_Frontend
   public function frontend_scripts()
   {
     if (is_checkout()) {
+      // Enqueue frontend CSS for priority processing styling
+      wp_enqueue_style(
+        'wpp-frontend',
+        WPP_PLUGIN_URL . 'assets/frontend.css',
+        ['woocommerce-general'],
+        WPP_VERSION
+      );
+
       // Check if using blocks
       $using_blocks = has_block('woocommerce/checkout');
 
@@ -256,24 +255,18 @@ class WPP_Frontend
         ?>
         <tr class="wpp-priority-row">
           <td colspan="2" style="padding: 15px 0 10px 0;">
-            <div id="wpp-priority-section" style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6;">
-              <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px; float: left;">
-                ⚡ <?php echo esc_html($section_title); ?>
-              </h4>
-              <div style="clear: both;"></div>
-              <label style="cursor: pointer; font-size: 14px;">
+            <div id="wpp-priority-section">
+              <h4>⚡ <?php echo esc_html($section_title); ?></h4>
+              <label>
                 <input type="checkbox" id="wpp_priority_checkbox" class="wpp-priority-checkbox"
-                  name="priority_processing" value="1" <?php checked($priority, true); ?>
-                  style="margin-right: 10px; vertical-align: top; transform: scale(1.1);" />
+                  name="priority_processing" value="1" <?php checked($priority, true); ?> />
                 <span>
-                  <strong style="color: #28a745;">
+                  <strong>
                     <?php echo esc_html($checkbox_label); ?>
-                    <span style="color: #dc3545;">( + <?php echo wc_price($fee_amount); ?>)</span>
+                    <span class="wpp-price">( + <?php echo wc_price($fee_amount); ?>)</span>
                   </strong>
                   <?php if ($description): ?>
-                    <br><small style="color: #6c757d; display: block; margin-top: 4px; line-height: 1.4;">
-                      <?php echo esc_html($description); ?>
-                    </small>
+                    <small><?php echo esc_html($description); ?></small>
                   <?php endif; ?>
                 </span>
               </label>

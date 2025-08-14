@@ -1,0 +1,241 @@
+/* WooCommerce Priority Processing - Frontend Styles */
+
+/* Container and Row Styles */
+.wpp-priority-row td {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Main Priority Processing Section */
+#wpp-priority-section,
+#wpp-priority-option-fallback {
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 20px;
+}
+
+/* Section Title */
+#wpp-priority-section h4,
+#wpp-priority-option-fallback h4 {
+  margin: 0 0 15px 0;
+  color: #495057;
+  font-size: 16px;
+  width: 100%;
+  clear: both;
+  font-weight: 600;
+}
+
+/* Label and Checkbox Layout */
+#wpp-priority-section label,
+#wpp-priority-option-fallback label {
+  width: 100% !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Text Content */
+#wpp-priority-section label span,
+#wpp-priority-option-fallback label span {
+  flex: 1 !important;
+  min-width: 0 !important;
+  display: inline-block;
+}
+
+/* Checkbox Styling */
+#wpp-priority-section input[type="checkbox"],
+#wpp-priority-option-fallback input[type="checkbox"] {
+  flex-shrink: 0 !important;
+  margin: 2px 0 0 0;
+  transform: scale(1.1);
+  cursor: pointer;
+}
+
+/* Strong Text and Price */
+#wpp-priority-section label strong,
+#wpp-priority-option-fallback label strong {
+  color: #28a745;
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+/* Price Styling */
+#wpp-priority-section .wpp-price,
+#wpp-priority-option-fallback .wpp-price {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+/* Description Text */
+#wpp-priority-section small,
+#wpp-priority-option-fallback small {
+  color: #6c757d;
+  display: block;
+  line-height: 1.4;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+/* Loading States */
+.wpp-priority-checkbox:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wpp-loading #wpp-priority-section,
+.wpp-loading #wpp-priority-option-fallback {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Hover Effects */
+#wpp-priority-section:hover,
+#wpp-priority-option-fallback:hover {
+  border-color: #28a745;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.1);
+  transition: all 0.2s ease;
+}
+
+/* Focus States for Accessibility */
+#wpp-priority-section input[type="checkbox"]:focus,
+#wpp-priority-option-fallback input[type="checkbox"]:focus {
+  outline: 2px solid #28a745;
+  outline-offset: 2px;
+}
+
+/* Animation for AJAX Updates */
+@keyframes wpp-update {
+  0% {
+    background-color: #e8f5e8;
+  }
+
+  100% {
+    background-color: #f8f9fa;
+  }
+}
+
+.wpp-updated {
+  animation: wpp-update 0.5s ease;
+}
+
+/* Tablet Styles */
+@media (max-width: 1024px) {
+
+  #wpp-priority-section,
+  #wpp-priority-option-fallback {
+    padding: 18px;
+  }
+
+  #wpp-priority-section h4,
+  #wpp-priority-option-fallback h4 {
+    font-size: 15px;
+  }
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+
+  #wpp-priority-section,
+  #wpp-priority-option-fallback {
+    padding: 15px !important;
+    margin: 10px 0 !important;
+  }
+
+  #wpp-priority-section h4,
+  #wpp-priority-option-fallback h4 {
+    font-size: 14px !important;
+    margin-bottom: 10px !important;
+  }
+
+  #wpp-priority-section label,
+  #wpp-priority-option-fallback label {
+    font-size: 13px !important;
+    gap: 8px !important;
+  }
+
+  #wpp-priority-section small,
+  #wpp-priority-option-fallback small {
+    font-size: 12px;
+  }
+}
+
+/* Small Mobile Styles */
+@media (max-width: 480px) {
+
+  #wpp-priority-section,
+  #wpp-priority-option-fallback {
+    padding: 12px !important;
+    border-radius: 4px;
+  }
+
+  #wpp-priority-section h4,
+  #wpp-priority-option-fallback h4 {
+    font-size: 13px !important;
+    margin-bottom: 8px !important;
+  }
+
+  #wpp-priority-section label,
+  #wpp-priority-option-fallback label {
+    font-size: 12px !important;
+  }
+}
+
+/* RTL Support */
+[dir="rtl"] #wpp-priority-section label,
+[dir="rtl"] #wpp-priority-option-fallback label {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] #wpp-priority-section input[type="checkbox"],
+[dir="rtl"] #wpp-priority-option-fallback input[type="checkbox"] {
+  margin: 2px 0 0 10px;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+
+  #wpp-priority-section,
+  #wpp-priority-option-fallback {
+    border: 2px solid #000;
+    background: #fff;
+  }
+
+  #wpp-priority-section label strong,
+  #wpp-priority-option-fallback label strong {
+    color: #000;
+  }
+
+  #wpp-priority-section .wpp-price,
+  #wpp-priority-option-fallback .wpp-price {
+    color: #000;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+
+  #wpp-priority-section,
+  #wpp-priority-option-fallback {
+    transition: none;
+  }
+
+  .wpp-updated {
+    animation: none;
+  }
+
+  #wpp-priority-section input[type="checkbox"],
+  #wpp-priority-option-fallback input[type="checkbox"] {
+    transform: none;
+  }
+}
