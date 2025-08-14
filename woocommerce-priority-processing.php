@@ -3,7 +3,7 @@
 /**
  * Plugin Name: WooCommerce Priority Processing
  * Description: Add priority processing and express shipping option at checkout
- * Version: 1.0.4
+ * Version: 1.1.0
  * Author: OpenWPClub.com
  * Author URI: https://openwpclub.com
  * License: GPL v2 or later
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WPP_VERSION', '1.0.4');
+define('WPP_VERSION', '1.1.0');
 define('WPP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPP_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -32,6 +32,7 @@ add_action('before_woocommerce_init', function () {
 });
 
 // Include class files
+require_once WPP_PLUGIN_DIR . 'includes/wpp-permissions.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-statistics.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-admin.php';
 require_once WPP_PLUGIN_DIR . 'includes/wpp-frontend.php';
@@ -103,6 +104,10 @@ class WooCommerce_Priority_Processing
     register_setting('wpp_settings', 'wpp_description');
     register_setting('wpp_settings', 'wpp_fee_label');
     register_setting('wpp_settings', 'wpp_section_title');
+    register_setting('wpp_settings', 'wpp_allowed_user_roles', [
+      'sanitize_callback' => [$this, 'sanitize_user_roles']
+    ]);
+    register_setting('wpp_settings', 'wpp_allow_guests');
 
     // Set defaults if not set
     if (get_option('wpp_fee_amount') === false) {
@@ -123,6 +128,39 @@ class WooCommerce_Priority_Processing
     if (get_option('wpp_enabled') === false) {
       update_option('wpp_enabled', '1');
     }
+    if (get_option('wpp_allowed_user_roles') === false) {
+      update_option('wpp_allowed_user_roles', ['customer']);
+    }
+    if (get_option('wpp_allow_guests') === false) {
+      update_option('wpp_allow_guests', '1');
+    }
+  }
+
+  /**
+   * Sanitize user roles to ensure they're saved as an array
+   */
+  public function sanitize_user_roles($roles)
+  {
+    if (empty($roles)) {
+      return ['customer']; // Default fallback
+    }
+
+    // Ensure it's an array
+    if (!is_array($roles)) {
+      $roles = [$roles];
+    }
+
+    // Sanitize each role
+    $sanitized_roles = [];
+    foreach ($roles as $role) {
+      $clean_role = sanitize_text_field($role);
+      if (!empty($clean_role)) {
+        $sanitized_roles[] = $clean_role;
+      }
+    }
+
+    // Return array or default if empty
+    return !empty($sanitized_roles) ? $sanitized_roles : ['customer'];
   }
 
   public function clear_priority_session()
@@ -145,6 +183,8 @@ class WooCommerce_Priority_Processing
     add_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
     add_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
     add_option('wpp_section_title', __('Express Options', 'woo-priority'));
+    add_option('wpp_allowed_user_roles', ['customer']);
+    add_option('wpp_allow_guests', '1');
 
     // Optionally schedule daily statistics refresh
     if ($this->statistics) {
@@ -204,6 +244,8 @@ register_activation_hook(__FILE__, function () {
   add_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
   add_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
   add_option('wpp_section_title', __('Express Options', 'woo-priority'));
+  add_option('wpp_allowed_user_roles', ['customer']);
+  add_option('wpp_allow_guests', '1');
 });
 
 register_deactivation_hook(__FILE__, function () {

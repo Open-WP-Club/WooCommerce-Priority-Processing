@@ -67,6 +67,37 @@ class WPP_Admin
     register_setting('wpp_settings', 'wpp_description');
     register_setting('wpp_settings', 'wpp_fee_label');
     register_setting('wpp_settings', 'wpp_section_title');
+    register_setting('wpp_settings', 'wpp_allowed_user_roles', [
+      'sanitize_callback' => [$this, 'sanitize_user_roles']
+    ]);
+    register_setting('wpp_settings', 'wpp_allow_guests');
+  }
+
+  /**
+   * Sanitize user roles to ensure they're saved as an array
+   */
+  public function sanitize_user_roles($roles)
+  {
+    if (empty($roles)) {
+      return ['customer']; // Default fallback
+    }
+
+    // Ensure it's an array
+    if (!is_array($roles)) {
+      $roles = [$roles];
+    }
+
+    // Sanitize each role
+    $sanitized_roles = [];
+    foreach ($roles as $role) {
+      $clean_role = sanitize_text_field($role);
+      if (!empty($clean_role)) {
+        $sanitized_roles[] = $clean_role;
+      }
+    }
+
+    // Return array or default if empty
+    return !empty($sanitized_roles) ? $sanitized_roles : ['customer'];
   }
 
   public function admin_page()
@@ -226,6 +257,86 @@ class WPP_Admin
             </div>
 
             <div class="wpp-feature-section">
+              <div class="wpp-feature-title"><?php _e('User Permissions', 'woo-priority'); ?></div>
+
+              <table class="form-table">
+                <tr>
+                  <th scope="row">
+                    <label for="wpp_allowed_user_roles"><?php _e('Allowed User Roles', 'woo-priority'); ?></label>
+                  </th>
+                  <td>
+                    <?php
+                    $allowed_roles = WPP_Permissions::get_allowed_user_roles();
+                    $available_roles = WPP_Permissions::get_available_user_roles();
+                    ?>
+                    <div class="wpp-roles-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fafafa;">
+                      <?php foreach ($available_roles as $role_key => $role_name): ?>
+                        <label style="display: block; margin: 5px 0; cursor: pointer;">
+                          <input type="checkbox" name="wpp_allowed_user_roles[]" value="<?php echo esc_attr($role_key); ?>"
+                            <?php checked(in_array($role_key, $allowed_roles)); ?>
+                            style="margin-right: 8px;" />
+                          <strong><?php echo esc_html($role_name); ?></strong>
+                          <small style="color: #666;"> (<?php echo esc_html($role_key); ?>)</small>
+                        </label>
+                      <?php endforeach; ?>
+                    </div>
+                    <p class="description">
+                      <?php _e('Select which user roles can access the priority processing option. ', 'woo-priority'); ?>
+                      <strong><?php _e('Shop Managers and Administrators always have access.', 'woo-priority'); ?></strong>
+                    </p>
+                  </td>
+                </tr>
+
+                <tr>
+                  <th scope="row">
+                    <label for="wpp_allow_guests"><?php _e('Guest Access', 'woo-priority'); ?></label>
+                  </th>
+                  <td>
+                    <div class="wpp-toggle-wrapper">
+                      <label class="wpp-toggle">
+                        <input type="checkbox" id="wpp_allow_guests" name="wpp_allow_guests" value="1"
+                          <?php checked(get_option('wpp_allow_guests', '1'), '1'); ?> />
+                        <span class="wpp-toggle-slider"></span>
+                      </label>
+                      <span class="wpp-guest-status">
+                        <?php echo (get_option('wpp_allow_guests', '1') === '1') ? __('Allowed', 'woo-priority') : __('Denied', 'woo-priority'); ?>
+                      </span>
+                    </div>
+                    <p class="description"><?php _e('Allow non-logged-in users (guests) to access priority processing option', 'woo-priority'); ?></p>
+                  </td>
+                </tr>
+
+                <tr>
+                  <th scope="row">
+                    <?php _e('Current Access', 'woo-priority'); ?>
+                  </th>
+                  <td>
+                    <div class="wpp-permission-summary" id="wpp-permission-summary">
+                      <?php
+                      $summary = WPP_Permissions::get_permission_summary();
+                      if (!empty($summary)):
+                      ?>
+                        <div style="background: #e7f3ff; border: 1px solid #b3d9ff; padding: 10px; border-radius: 4px;">
+                          <strong><?php _e('Priority processing is available to:', 'woo-priority'); ?></strong>
+                          <ul style="margin: 5px 0 0 20px;">
+                            <?php foreach ($summary as $role): ?>
+                              <li><?php echo esc_html($role); ?></li>
+                            <?php endforeach; ?>
+                          </ul>
+                        </div>
+                      <?php else: ?>
+                        <div style="background: #fff2e5; border: 1px solid #ffcc99; padding: 10px; border-radius: 4px;">
+                          <strong><?php _e('⚠️ No users currently have access to priority processing', 'woo-priority'); ?></strong>
+                        </div>
+                      <?php endif; ?>
+                    </div>
+                    <p class="description"><?php _e('This shows who can currently see and use the priority processing option', 'woo-priority'); ?></p>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="wpp-feature-section">
               <div class="wpp-feature-title"><?php _e('Display Settings', 'woo-priority'); ?></div>
 
               <table class="form-table">
@@ -310,6 +421,20 @@ class WPP_Admin
           </div>
 
           <div style="margin-top: 20px;">
+            <h4><?php _e('Permission Summary', 'woo-priority'); ?></h4>
+            <div id="preview-permission-summary" style="font-size: 12px; color: #646970;">
+              <?php
+              $summary = WPP_Permissions::get_permission_summary();
+              if (!empty($summary)) {
+                echo '<strong>Available to:</strong> ' . implode(', ', $summary);
+              } else {
+                echo '<strong>⚠️ No access granted</strong>';
+              }
+              ?>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px;">
             <h4><?php _e('Order Management', 'woo-priority'); ?></h4>
             <p style="font-size: 13px; color: #646970; line-height: 1.4;">
               <?php _e('Priority orders will be clearly marked with ⚡ lightning bolts in your order list and individual order pages for easy identification.', 'woo-priority'); ?>
@@ -323,6 +448,7 @@ class WPP_Admin
               <li><?php _e('Use clear, benefit-focused language in your checkbox label', 'woo-priority'); ?></li>
               <li><?php _e('Keep descriptions concise but informative about delivery timeframes', 'woo-priority'); ?></li>
               <li><?php _e('Priority orders are automatically marked with ⚡ in your admin area', 'woo-priority'); ?></li>
+              <li><?php _e('Control access with user roles and guest permissions for security', 'woo-priority'); ?></li>
             </ul>
           </div>
 
@@ -381,6 +507,60 @@ class WPP_Admin
           $('.wpp-stat-value').last().text(enabled ? '✅' : '❌');
         }
 
+        // Permission settings handlers
+        function updatePermissionSummary() {
+          var selectedRoles = [];
+          var allowGuests = $('#wpp_allow_guests').is(':checked');
+
+          // Always include shop managers
+          selectedRoles.push('Shop Managers');
+
+          // Get selected user roles
+          $('input[name="wpp_allowed_user_roles[]"]:checked').each(function() {
+            var roleLabel = $(this).parent().find('strong').text();
+            selectedRoles.push(roleLabel);
+          });
+
+          // Add guests if allowed
+          if (allowGuests) {
+            selectedRoles.push('Guest Users');
+          }
+
+          // Update summary display
+          var $summary = $('#wpp-permission-summary');
+          if (selectedRoles.length > 1) { // More than just shop managers
+            var summaryHtml = '<div style="background: #e7f3ff; border: 1px solid #b3d9ff; padding: 10px; border-radius: 4px;">' +
+              '<strong>Priority processing is available to:</strong>' +
+              '<ul style="margin: 5px 0 0 20px;">';
+
+            selectedRoles.forEach(function(role) {
+              summaryHtml += '<li>' + role + '</li>';
+            });
+
+            summaryHtml += '</ul></div>';
+            $summary.html(summaryHtml);
+          } else {
+            $summary.html('<div style="background: #fff2e5; border: 1px solid #ffcc99; padding: 10px; border-radius: 4px;">' +
+              '<strong>⚠️ Only Shop Managers currently have access to priority processing</strong></div>');
+          }
+
+          // Update guest status text
+          $('.wpp-guest-status').text(allowGuests ? 'Allowed' : 'Denied');
+
+          // Update preview permission summary
+          $('#preview-permission-summary').html(
+            selectedRoles.length > 1 ?
+            '<strong>Available to:</strong> ' + selectedRoles.join(', ') :
+            '<strong>⚠️ No access granted</strong>'
+          );
+        }
+
+        // Bind permission change events
+        $('input[name="wpp_allowed_user_roles[]"], #wpp_allow_guests').on('change', function() {
+          updatePermissionSummary();
+          updatePreview(); // Also update main preview
+        });
+
         // Bind events for live preview
         $('#wpp_section_title, #wpp_checkbox_label, #wpp_description, #wpp_fee_amount').on('input', updatePreview);
         $('#wpp_enabled').on('change', updatePreview);
@@ -388,6 +568,8 @@ class WPP_Admin
         // Force immediate update on page load to clean any cached content
         setTimeout(function() {
           updatePreview();
+          updatePermissionSummary();
+
           // Force clean the stat value specifically
           var currentFee = $('#wpp_fee_amount').val() || '0.00';
           $('.wpp-stat-value').first().text(currentFee);
@@ -412,6 +594,7 @@ class WPP_Admin
 
         // Initial preview update
         updatePreview();
+        updatePermissionSummary();
 
         // Statistics refresh handler
         $('#wpp-refresh-stats').on('click', function(e) {

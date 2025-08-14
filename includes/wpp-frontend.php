@@ -52,6 +52,12 @@ class WPP_Frontend
       return;
     }
 
+    // Check user permissions
+    if (!WPP_Permissions::can_access_priority_processing()) {
+      WPP_Permissions::log_permission_check('add_priority_checkbox');
+      return;
+    }
+
     $fee_amount = get_option('wpp_fee_amount', '5.00');
     $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
     $description = get_option('wpp_description', '');
@@ -97,6 +103,12 @@ class WPP_Frontend
   public function add_priority_checkbox_fallback()
   {
     if (get_option('wpp_enabled') !== 'yes' && get_option('wpp_enabled') !== '1') {
+      return;
+    }
+
+    // Check user permissions
+    if (!WPP_Permissions::can_access_priority_processing()) {
+      WPP_Permissions::log_permission_check('add_priority_checkbox_fallback');
       return;
     }
 
@@ -180,6 +192,13 @@ class WPP_Frontend
       return;
     }
 
+    // Check user permissions
+    if (!WPP_Permissions::can_access_priority_processing()) {
+      WPP_Permissions::log_permission_check('ajax_update_priority');
+      wp_send_json_error('Permission denied');
+      return;
+    }
+
     if (!WC()->session) {
       wp_send_json_error('WooCommerce session not available');
       return;
@@ -230,7 +249,7 @@ class WPP_Frontend
           }
         }
 
-        // Add checkbox row to preserve it
+        // Add checkbox row to preserve it - only if user has permission
         $checkbox_label = get_option('wpp_checkbox_label', 'Priority processing + Express shipping');
         $section_title = get_option('wpp_section_title', 'Express Options');
         $description = get_option('wpp_description', '');
@@ -289,7 +308,8 @@ class WPP_Frontend
       'debug' => [
         'priority' => $priority,
         'fee_amount' => $priority_fee_amount,
-        'new_total' => wc_price($new_total)
+        'new_total' => wc_price($new_total),
+        'permission_check' => 'passed'
       ]
     ]);
   }
@@ -297,6 +317,12 @@ class WPP_Frontend
   public function add_priority_fee()
   {
     if (!is_checkout() || (get_option('wpp_enabled') !== 'yes' && get_option('wpp_enabled') !== '1')) {
+      return;
+    }
+
+    // Check user permissions
+    if (!WPP_Permissions::can_access_priority_processing()) {
+      WPP_Permissions::log_permission_check('add_priority_fee');
       return;
     }
 
