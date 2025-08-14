@@ -740,67 +740,6 @@ class WPP_Admin
       // Enqueue admin styles for order pages
       wp_enqueue_style('wpp-admin-order', WPP_PLUGIN_URL . 'assets/admin.css', [], WPP_VERSION);
       wp_enqueue_script('jquery');
-
-      // Add inline styles for meta box
-      wp_add_inline_style('wpp-admin-order', '
-        #wpp_order_priority .inside {
-          padding: 12px !important;
-        }
-        
-        #wpp_order_priority h2 {
-          font-size: 14px !important;
-          padding: 8px 12px !important;
-          margin: 0 !important;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-          color: white !important;
-        }
-        
-        #wpp-order-priority-container .notice {
-          margin: 0 0 10px 0 !important;
-        }
-        
-        .wpp-priority-actions .button {
-          text-decoration: none !important;
-          box-shadow: none !important;
-          transition: all 0.2s ease;
-        }
-        
-        .wpp-priority-actions .button:hover {
-          transform: translateY(-1px);
-        }
-        
-        #wpp-add-priority {
-          background: #28a745 !important;
-          border-color: #28a745 !important;
-          color: white !important;
-        }
-        
-        #wpp-add-priority:hover {
-          background: #218838 !important;
-          border-color: #1e7e34 !important;
-        }
-        
-        #wpp-remove-priority {
-          background: #dc3545 !important;
-          border-color: #dc3545 !important;
-          color: white !important;
-        }
-        
-        #wpp-remove-priority:hover {
-          background: #c82333 !important;
-          border-color: #bd2130 !important;
-        }
-        
-        @keyframes wpp-pulse {
-          0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
-          70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-        }
-        
-        .wpp-priority-actions .button.wpp-pulse {
-          animation: wpp-pulse 2s infinite;
-        }
-      ');
     }
   }
 
