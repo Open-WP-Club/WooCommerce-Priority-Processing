@@ -81,10 +81,10 @@ class WPP_Order_Admin
           <?php if ($existing_fee): ?>
             <p><?php printf(__('Fee: %s'), wc_price($existing_fee->get_total())); ?></p>
           <?php endif; ?>
-          
+
           <?php if ($can_modify): ?>
-            <button type="button" id="wpp-remove-priority" class="button button-secondary" 
-                    data-order-id="<?php echo $order_id; ?>" style="width: 100%; margin-top: 10px;">
+            <button type="button" id="wpp-remove-priority" class="button button-secondary"
+              data-order-id="<?php echo $order_id; ?>" style="width: 100%; margin-top: 10px;">
               <?php _e('Remove Priority Processing', 'woo-priority'); ?>
             </button>
           <?php endif; ?>
@@ -92,13 +92,13 @@ class WPP_Order_Admin
       <?php else: ?>
         <div class="wpp-priority-inactive">
           <p><strong><?php _e('Standard Processing', 'woo-priority'); ?></strong></p>
-          
+
           <?php if ($can_modify): ?>
-            <button type="button" id="wpp-add-priority" class="button button-primary" 
-                    data-order-id="<?php echo $order_id; ?>" style="width: 100%; margin-top: 10px;">
+            <button type="button" id="wpp-add-priority" class="button button-primary"
+              data-order-id="<?php echo $order_id; ?>" style="width: 100%; margin-top: 10px;">
               <?php printf(__('Add Priority Processing (+%s)', 'woo-priority'), wc_price($fee_amount)); ?>
             </button>
-            
+
             <p style="font-size: 12px; color: #666; margin-top: 8px;">
               <?php printf(__('New total: %s'), wc_price($order->get_total() + floatval($fee_amount))); ?>
             </p>
@@ -115,61 +115,6 @@ class WPP_Order_Admin
         <div style="margin-top: 5px; font-size: 12px;"><?php _e('Processing...', 'woo-priority'); ?></div>
       </div>
     </div>
-
-    <script>
-      jQuery(document).ready(function($) {
-        $('#wpp-add-priority, #wpp-remove-priority').on('click', function(e) {
-          e.preventDefault();
-
-          var $button = $(this);
-          var orderId = $button.data('order-id');
-          var isAdding = $button.attr('id') === 'wpp-add-priority';
-          var action = isAdding ? 'add' : 'remove';
-
-          // Show loading state
-          $('#wpp-loading').show();
-          $button.prop('disabled', true);
-
-          // Confirm action
-          var confirmMsg = isAdding ?
-            '<?php echo esc_js(__("Add priority processing to this order?", "woo-priority")); ?>' :
-            '<?php echo esc_js(__("Remove priority processing from this order?", "woo-priority")); ?>';
-
-          if (!confirm(confirmMsg)) {
-            $('#wpp-loading').hide();
-            $button.prop('disabled', false);
-            return;
-          }
-
-          // Send AJAX request
-          $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-              action: 'wpp_toggle_order_priority',
-              order_id: orderId,
-              priority_action: action,
-              nonce: $('#wpp_order_priority_nonce').val()
-            },
-            success: function(response) {
-              if (response.success) {
-                // Reload the page to show updated order
-                window.location.reload();
-              } else {
-                alert('<?php echo esc_js(__("Error:", "woo-priority")); ?> ' + (response.data || '<?php echo esc_js(__("Unknown error occurred", "woo-priority")); ?>'));
-                $('#wpp-loading').hide();
-                $button.prop('disabled', false);
-              }
-            },
-            error: function() {
-              alert('<?php echo esc_js(__("Connection error. Please try again.", "woo-priority")); ?>');
-              $('#wpp-loading').hide();
-              $button.prop('disabled', false);
-            }
-          });
-        });
-      });
-    </script>
 <?php
   }
 
@@ -224,10 +169,7 @@ class WPP_Order_Admin
           return;
         }
 
-        // Add priority meta
-        $order->update_meta_data('_priority_processing', 'yes');
-
-        // Add fee if not exists
+        // Check if priority fee already exists before adding
         $existing_fee = null;
         foreach ($order->get_fees() as $fee) {
           if (strpos($fee->get_name(), 'Priority') !== false || $fee->get_name() === $fee_label) {
@@ -236,13 +178,24 @@ class WPP_Order_Admin
           }
         }
 
-        if (!$existing_fee && $fee_amount > 0) {
+        if ($existing_fee) {
+          wp_send_json_error(__('Order already has a priority processing fee', 'woo-priority'));
+          return;
+        }
+
+        // Add priority meta
+        $order->update_meta_data('_priority_processing', 'yes');
+
+        // Add fee only if it doesn't exist and amount > 0
+        if ($fee_amount > 0) {
           $fee = new WC_Order_Item_Fee();
           $fee->set_name($fee_label);
           $fee->set_amount($fee_amount);
           $fee->set_total($fee_amount);
           $fee->set_order_id($order_id);
           $order->add_item($fee);
+
+          error_log("WPP: Added priority fee of {$fee_amount} to order #{$order_id}");
         }
 
         // Add order note
@@ -340,8 +293,6 @@ class WPP_Order_Admin
       // Localize script with minimal parameters
       wp_localize_script('wpp-order-admin', 'wpp_order_admin', [
         'ajax_url' => admin_url('admin-ajax.php'),
-        'confirm_add' => __('Add priority processing to this order?', 'woo-priority'),
-        'confirm_remove' => __('Remove priority processing from this order?', 'woo-priority'),
         'error_title' => __('Error:', 'woo-priority'),
         'connection_error' => __('Connection error. Please try again.', 'woo-priority')
       ]);
