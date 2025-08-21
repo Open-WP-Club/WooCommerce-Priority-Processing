@@ -384,7 +384,7 @@ class WPP_Frontend
       // Enqueue frontend CSS for priority processing styling
       wp_enqueue_style(
         'wpp-frontend',
-        WPP_PLUGIN_URL . 'assets/frontend.css',
+        WPP_PLUGIN_URL . 'assets/css/frontend.css',
         ['woocommerce-general'],
         WPP_VERSION
       );
@@ -393,7 +393,7 @@ class WPP_Frontend
       $using_blocks = has_block('woocommerce/checkout');
 
       if ($using_blocks) {
-        wp_enqueue_script('wpp-frontend-blocks', WPP_PLUGIN_URL . 'assets/frontend-blocks.js', ['jquery'], WPP_VERSION, true);
+        wp_enqueue_script('wpp-frontend-blocks', WPP_PLUGIN_URL . 'assets/js/frontend-blocks.js', ['jquery'], WPP_VERSION, true);
         wp_localize_script('wpp-frontend-blocks', 'wpp_ajax', [
           'ajax_url' => admin_url('admin-ajax.php'),
           'nonce' => wp_create_nonce('wpp_nonce'),
@@ -404,7 +404,7 @@ class WPP_Frontend
           'using_blocks' => true
         ]);
       } else {
-        wp_enqueue_script('wpp-frontend', WPP_PLUGIN_URL . 'assets/frontend.js', ['jquery'], WPP_VERSION, true);
+        wp_enqueue_script('wpp-frontend', WPP_PLUGIN_URL . 'assets/js/frontend.js', ['jquery'], WPP_VERSION, true);
         wp_localize_script('wpp-frontend', 'wpp_ajax', [
           'ajax_url' => admin_url('admin-ajax.php'),
           'nonce' => wp_create_nonce('wpp_nonce'),

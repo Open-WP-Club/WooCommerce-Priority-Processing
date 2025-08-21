@@ -1,0 +1,60 @@
+/* WooCommerce Priority Processing */
+
+#wpp-order-priority-container {
+  font-size: 13px;
+}
+
+.wpp-priority-active,
+.wpp-priority-inactive {
+  padding: 10px 0;
+}
+
+.wpp-priority-active strong {
+  color: #0f5132;
+}
+
+#wpp-add-priority,
+#wpp-remove-priority {
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
+}
+
+#wpp-add-priority {
+  background: #28a745;
+  border-color: #28a745;
+  color: white;
+}
+
+#wpp-add-priority:hover {
+  background: #218838;
+  border-color: #1e7e34;
+}
+
+#wpp-remove-priority {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+#wpp-remove-priority:hover {
+  background: #c82333;
+  border-color: #bd2130;
+}
+
+#wpp-loading {
+  text-align: center;
+  padding: 10px;
+}
+
+#wpp-loading .spinner {
+  float: none;
+  margin: 0 auto;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  #wpp-order-priority-container {
+    font-size: 12px;
+  }
+}
