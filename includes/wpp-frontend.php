@@ -62,22 +62,22 @@ class WPP_Frontend
       return $packages;
     }
 
-    $priority_fee = floatval(get_option('wpp_fee_amount', '5.00'));
+    $total_priority_fee = $this->get_total_priority_fee_amount();
 
-    if ($priority_fee <= 0) {
+    if ($total_priority_fee <= 0) {
       return $packages;
     }
 
-    error_log("WPP: Adding priority metadata to shipping packages (fee: {$priority_fee})");
+    error_log("WPP: Adding priority metadata to shipping packages (total fee including tax: {$total_priority_fee})");
 
     foreach ($packages as $package_key => &$package) {
       // SAFE: Only add metadata - don't modify contents_cost or line_total
       $packages[$package_key]['priority_processing'] = [
         'enabled' => true,
-        'fee_amount' => $priority_fee,
+        'fee_amount' => $total_priority_fee,
         'service_level' => 'express',
         'requires_priority_handling' => true,
-        'total_declared_value' => ($package['contents_cost'] ?? 0) + $priority_fee
+        'total_declared_value' => ($package['contents_cost'] ?? 0) + $total_priority_fee
       ];
 
       error_log("WPP: Added priority metadata to package {$package_key}");
@@ -123,18 +123,22 @@ class WPP_Frontend
       return $request_data;
     }
 
-    $priority_fee = floatval(get_option('wpp_fee_amount', '5.00'));
+    $total_priority_fee = $this->get_total_priority_fee_amount();
 
-    error_log("WPP: Modifying FedEx API request - adding priority fee: {$priority_fee}");
+    if ($total_priority_fee <= 0) {
+      return $request_data;
+    }
+
+    error_log("WPP: Modifying FedEx API request - adding total priority fee (including tax): {$total_priority_fee}");
 
     // Modify declared value for insurance (common FedEx API structure)
     if (isset($request_data['RequestedShipment']['RequestedPackageLineItems'])) {
       foreach ($request_data['RequestedShipment']['RequestedPackageLineItems'] as $key => &$item) {
         if (isset($item['InsuredValue']['Amount'])) {
           $original_value = $item['InsuredValue']['Amount'];
-          $request_data['RequestedShipment']['RequestedPackageLineItems'][$key]['InsuredValue']['Amount'] = $original_value + $priority_fee;
+          $request_data['RequestedShipment']['RequestedPackageLineItems'][$key]['InsuredValue']['Amount'] = $original_value + $total_priority_fee;
 
-          error_log("WPP: FedEx declared value: {$original_value} -> " . ($original_value + $priority_fee));
+          error_log("WPP: FedEx declared value: {$original_value} -> " . ($original_value + $total_priority_fee));
         }
       }
     }
@@ -142,9 +146,9 @@ class WPP_Frontend
     // Also modify customs value for international shipments
     if (isset($request_data['RequestedShipment']['CustomsClearanceDetail']['CustomsValue']['Amount'])) {
       $original_customs = $request_data['RequestedShipment']['CustomsClearanceDetail']['CustomsValue']['Amount'];
-      $request_data['RequestedShipment']['CustomsClearanceDetail']['CustomsValue']['Amount'] = $original_customs + $priority_fee;
+      $request_data['RequestedShipment']['CustomsClearanceDetail']['CustomsValue']['Amount'] = $original_customs + $total_priority_fee;
 
-      error_log("WPP: FedEx customs value: {$original_customs} -> " . ($original_customs + $priority_fee));
+      error_log("WPP: FedEx customs value: {$original_customs} -> " . ($original_customs + $total_priority_fee));
     }
 
     return $request_data;
@@ -159,16 +163,20 @@ class WPP_Frontend
       return $request_data;
     }
 
-    $priority_fee = floatval(get_option('wpp_fee_amount', '5.00'));
+    $total_priority_fee = $this->get_total_priority_fee_amount();
 
-    error_log("WPP: Modifying UPS API request - adding priority fee: {$priority_fee}");
+    if ($total_priority_fee <= 0) {
+      return $request_data;
+    }
+
+    error_log("WPP: Modifying UPS API request - adding total priority fee (including tax): {$total_priority_fee}");
 
     // UPS API structure for declared value
     if (isset($request_data['Package']['PackageServiceOptions']['DeclaredValue']['MonetaryValue'])) {
       $original_value = $request_data['Package']['PackageServiceOptions']['DeclaredValue']['MonetaryValue'];
-      $request_data['Package']['PackageServiceOptions']['DeclaredValue']['MonetaryValue'] = $original_value + $priority_fee;
+      $request_data['Package']['PackageServiceOptions']['DeclaredValue']['MonetaryValue'] = $original_value + $total_priority_fee;
 
-      error_log("WPP: UPS declared value: {$original_value} -> " . ($original_value + $priority_fee));
+      error_log("WPP: UPS declared value: {$original_value} -> " . ($original_value + $total_priority_fee));
     }
 
     return $request_data;
@@ -183,16 +191,20 @@ class WPP_Frontend
       return $request_data;
     }
 
-    $priority_fee = floatval(get_option('wpp_fee_amount', '5.00'));
+    $total_priority_fee = $this->get_total_priority_fee_amount();
 
-    error_log("WPP: Modifying USPS API request - adding priority fee: {$priority_fee}");
+    if ($total_priority_fee <= 0) {
+      return $request_data;
+    }
+
+    error_log("WPP: Modifying USPS API request - adding total priority fee (including tax): {$total_priority_fee}");
 
     // USPS typically uses 'Value' field for declared value
     if (isset($request_data['Value'])) {
       $original_value = $request_data['Value'];
-      $request_data['Value'] = $original_value + $priority_fee;
+      $request_data['Value'] = $original_value + $total_priority_fee;
 
-      error_log("WPP: USPS declared value: {$original_value} -> " . ($original_value + $priority_fee));
+      error_log("WPP: USPS declared value: {$original_value} -> " . ($original_value + $total_priority_fee));
     }
 
     return $request_data;
@@ -207,16 +219,20 @@ class WPP_Frontend
       return $request_data;
     }
 
-    $priority_fee = floatval(get_option('wpp_fee_amount', '5.00'));
+    $total_priority_fee = $this->get_total_priority_fee_amount();
 
-    error_log("WPP: Modifying DHL API request - adding priority fee: {$priority_fee}");
+    if ($total_priority_fee <= 0) {
+      return $request_data;
+    }
+
+    error_log("WPP: Modifying DHL API request - adding total priority fee (including tax): {$total_priority_fee}");
 
     // DHL API structure varies, but commonly uses 'DeclaredValue'
     if (isset($request_data['DeclaredValue'])) {
       $original_value = $request_data['DeclaredValue'];
-      $request_data['DeclaredValue'] = $original_value + $priority_fee;
+      $request_data['DeclaredValue'] = $original_value + $total_priority_fee;
 
-      error_log("WPP: DHL declared value: {$original_value} -> " . ($original_value + $priority_fee));
+      error_log("WPP: DHL declared value: {$original_value} -> " . ($original_value + $total_priority_fee));
     }
 
     return $request_data;
@@ -231,16 +247,20 @@ class WPP_Frontend
       return $request_data;
     }
 
-    $priority_fee = floatval(get_option('wpp_fee_amount', '5.00'));
+    $total_priority_fee = $this->get_total_priority_fee_amount();
+
+    if ($total_priority_fee <= 0) {
+      return $request_data;
+    }
 
     // Add priority information to generic requests
     $request_data['priority_processing'] = [
       'enabled' => true,
-      'fee_amount' => $priority_fee,
+      'fee_amount' => $total_priority_fee,
       'service_level' => 'express'
     ];
 
-    error_log("WPP: Added priority info to generic shipping request");
+    error_log("WPP: Added priority info to generic shipping request - total fee (including tax): {$total_priority_fee}");
 
     return $request_data;
   }
@@ -254,13 +274,15 @@ class WPP_Frontend
       return $rates;
     }
 
+    $total_priority_fee = $this->get_total_priority_fee_amount();
+
     // Add priority metadata to all shipping rates
     foreach ($rates as $rate_id => &$rate) {
       $rates[$rate_id]->add_meta_data('priority_processing', 'yes');
-      $rates[$rate_id]->add_meta_data('priority_fee_amount', get_option('wpp_fee_amount', '5.00'));
+      $rates[$rate_id]->add_meta_data('priority_fee_amount', $total_priority_fee);
     }
 
-    error_log("WPP: Added priority metadata to " . count($rates) . " shipping rates");
+    error_log("WPP: Added priority metadata to " . count($rates) . " shipping rates (total fee including tax: {$total_priority_fee})");
 
     return $rates;
   }
@@ -276,6 +298,39 @@ class WPP_Frontend
 
     $priority = WC()->session->get('priority_processing', false);
     return ($priority === true || $priority === '1' || $priority === 1);
+  }
+
+  /**
+   * Get the total priority fee amount including taxes
+   * This is more accurate than just using the base fee amount from settings
+   */
+  private function get_total_priority_fee_amount()
+  {
+    if (!$this->is_priority_processing_active()) {
+      return 0;
+    }
+
+    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
+    $base_fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+
+    // Try to get the actual fee from the cart (includes tax calculation)
+    if (WC()->cart) {
+      $cart_fees = WC()->cart->get_fees();
+      foreach ($cart_fees as $fee) {
+        if ($fee->name === $fee_label) {
+          $fee_total = floatval($fee->total);
+          $fee_tax = floatval($fee->tax);
+          $total_fee_with_tax = $fee_total + $fee_tax;
+
+          error_log("WPP: Found priority fee in cart - Base: {$fee_total}, Tax: {$fee_tax}, Total: {$total_fee_with_tax}");
+          return $total_fee_with_tax;
+        }
+      }
+    }
+
+    // Fallback to base amount if fee not found in cart
+    error_log("WPP: Priority fee not found in cart, using base amount: {$base_fee_amount}");
+    return $base_fee_amount;
   }
 
   public function add_priority_checkbox()
@@ -591,14 +646,16 @@ class WPP_Frontend
 
     $priority = WC()->session->get('priority_processing', false);
     if ($priority === true || $priority === 1 || $priority === '1') {
-      $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
+      $total_priority_fee = $this->get_total_priority_fee_amount();
+      $base_fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
 
       // Save priority meta data only - WooCommerce handles fee transfer automatically
       $order->update_meta_data('_priority_processing', 'yes');
 
       // Add shipping-specific meta data for shipping plugin integration
       $order->update_meta_data('_requires_express_shipping', 'yes');
-      $order->update_meta_data('_priority_fee_amount', $fee_amount);
+      $order->update_meta_data('_priority_fee_amount', $total_priority_fee); // Save total including tax
+      $order->update_meta_data('_priority_base_fee_amount', $base_fee_amount); // Save base amount for reference
       $order->update_meta_data('_priority_service_level', 'express');
 
       // Check if order already has the priority processing fee from this plugin
@@ -609,21 +666,25 @@ class WPP_Frontend
       foreach ($order_fees as $fee) {
         if ($fee->get_name() === $fee_label) {
           $priority_fee_exists = true;
-          error_log('WPP: Priority fee already exists in order: ' . $fee->get_name());
+          $actual_fee_total = floatval($fee->get_total()) + floatval($fee->get_total_tax());
+          error_log("WPP: Priority fee found in order: {$fee->get_name()} - Total: {$actual_fee_total}");
+
+          // Update the saved fee amount with the actual total from the order
+          $order->update_meta_data('_priority_fee_amount', $actual_fee_total);
           break;
         }
       }
 
       if ($priority_fee_exists) {
-        error_log('WPP: WARNING - Priority fee already found in order #' . $order->get_id());
+        error_log('WPP: Priority fee confirmed in order #' . $order->get_id());
       }
 
       // Fire action hook for shipping plugins that might want to integrate
-      do_action('wpp_priority_order_created', $order, $fee_amount);
+      do_action('wpp_priority_order_created', $order, $total_priority_fee);
 
       $order->save();
 
-      error_log("WPP: Priority processing saved to order #{$order->get_id()} with fee amount: {$fee_amount}");
+      error_log("WPP: Priority processing saved to order #{$order->get_id()} with total fee amount (including tax): {$total_priority_fee}");
     }
   }
 }
