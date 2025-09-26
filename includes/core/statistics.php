@@ -1,6 +1,10 @@
 <?php
 
-class WPP_Statistics
+/**
+ * Core Statistics Handler
+ * Manages statistics calculation, caching, and display for priority orders
+ */
+class Core_Statistics
 {
   private $cache_key = 'wpp_statistics_data';
   private $cache_duration;

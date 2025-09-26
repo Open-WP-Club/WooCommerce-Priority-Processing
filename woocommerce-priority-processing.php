@@ -3,7 +3,7 @@
 /**
  * Plugin Name: WooCommerce Priority Processing
  * Description: Add priority processing and express shipping option at checkout
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: OpenWPClub.com
  * Author URI: https://openwpclub.com
  * License: GPL v2 or later
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WPP_VERSION', '1.2.0');
+define('WPP_VERSION', '1.3.0');
 define('WPP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WPP_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -31,23 +31,19 @@ add_action('before_woocommerce_init', function () {
   }
 });
 
-// Include class files
-require_once WPP_PLUGIN_DIR . 'includes/wpp-permissions.php';
-require_once WPP_PLUGIN_DIR . 'includes/wpp-statistics.php';
-require_once WPP_PLUGIN_DIR . 'includes/wpp-admin.php';
-require_once WPP_PLUGIN_DIR . 'includes/wpp-order-admin.php';
-require_once WPP_PLUGIN_DIR . 'includes/wpp-frontend.php';
-require_once WPP_PLUGIN_DIR . 'includes/wpp-orders.php';
-
 class WooCommerce_Priority_Processing
 {
   private static $instance = null;
 
-  public $admin;
-  public $order_admin;
-  public $frontend;
-  public $orders;
-  public $statistics;
+  public $admin_menu;
+  public $admin_settings;
+  public $admin_dashboard;
+  public $frontend_checkout;
+  public $frontend_ajax;
+  public $frontend_fees;
+  public $frontend_shipping;
+  public $core_orders;
+  public $core_statistics;
 
   public static function instance()
   {
@@ -65,21 +61,54 @@ class WooCommerce_Priority_Processing
       return;
     }
 
+    // Include all required files first
+    $this->include_files();
+
     // Initialize plugin
     $this->init();
   }
 
+  /**
+   * Include all required files
+   */
+  private function include_files()
+  {
+    // Include core files
+    require_once WPP_PLUGIN_DIR . 'includes/core/permissions.php';
+    require_once WPP_PLUGIN_DIR . 'includes/core/statistics.php';
+    require_once WPP_PLUGIN_DIR . 'includes/core/orders.php';
+
+    // Include admin files
+    require_once WPP_PLUGIN_DIR . 'includes/admin/menu.php';
+    require_once WPP_PLUGIN_DIR . 'includes/admin/settings.php';
+    require_once WPP_PLUGIN_DIR . 'includes/admin/dashboard.php';
+
+    // Include frontend files
+    require_once WPP_PLUGIN_DIR . 'includes/frontend/checkout.php';
+    require_once WPP_PLUGIN_DIR . 'includes/frontend/ajax.php';
+    require_once WPP_PLUGIN_DIR . 'includes/frontend/fees.php';
+    require_once WPP_PLUGIN_DIR . 'includes/frontend/shipping.php';
+  }
+
   private function init()
   {
-    // Initialize components in proper order
-    $this->statistics = new WPP_Statistics();
-    $this->admin = new WPP_Admin();
-    $this->order_admin = new WPP_Order_Admin();
-    $this->frontend = new WPP_Frontend();
-    $this->orders = new WPP_Orders();
+    // Initialize core components
+    $this->core_statistics = new Core_Statistics();
+    $this->core_orders = new Core_Orders();
+
+    // Initialize admin components
+    $this->admin_menu = new Admin_Menu($this->core_statistics);
+    $this->admin_settings = new Admin_Settings();
+    $this->admin_dashboard = new Admin_Dashboard($this->core_statistics);
+
+    // Initialize frontend components
+    $this->frontend_checkout = new Frontend_Checkout();
+    $this->frontend_ajax = new Frontend_Ajax();
+    $this->frontend_fees = new Frontend_Fees();
+    $this->frontend_shipping = new Frontend_Shipping();
 
     // Register settings and defaults
-    add_action('admin_init', [$this, 'register_settings']);
+    add_action('admin_init', [$this, 'register_default_settings']);
 
     // Add cleanup hooks
     add_action('woocommerce_cart_emptied', [$this, 'clear_priority_session']);
@@ -99,19 +128,8 @@ class WooCommerce_Priority_Processing
 <?php
   }
 
-  public function register_settings()
+  public function register_default_settings()
   {
-    register_setting('wpp_settings', 'wpp_enabled');
-    register_setting('wpp_settings', 'wpp_fee_amount');
-    register_setting('wpp_settings', 'wpp_checkbox_label');
-    register_setting('wpp_settings', 'wpp_description');
-    register_setting('wpp_settings', 'wpp_fee_label');
-    register_setting('wpp_settings', 'wpp_section_title');
-    register_setting('wpp_settings', 'wpp_allowed_user_roles', [
-      'sanitize_callback' => [$this, 'sanitize_user_roles']
-    ]);
-    register_setting('wpp_settings', 'wpp_allow_guests');
-
     // Set defaults if not set
     if (get_option('wpp_fee_amount') === false) {
       update_option('wpp_fee_amount', '5.00');
@@ -139,33 +157,6 @@ class WooCommerce_Priority_Processing
     }
   }
 
-  /**
-   * Sanitize user roles to ensure they're saved as an array
-   */
-  public function sanitize_user_roles($roles)
-  {
-    if (empty($roles)) {
-      return ['customer']; // Default fallback
-    }
-
-    // Ensure it's an array
-    if (!is_array($roles)) {
-      $roles = [$roles];
-    }
-
-    // Sanitize each role
-    $sanitized_roles = [];
-    foreach ($roles as $role) {
-      $clean_role = sanitize_text_field($role);
-      if (!empty($clean_role)) {
-        $sanitized_roles[] = $clean_role;
-      }
-    }
-
-    // Return array or default if empty
-    return !empty($sanitized_roles) ? $sanitized_roles : ['customer'];
-  }
-
   public function clear_priority_session()
   {
     if (WC()->session) {
@@ -190,8 +181,8 @@ class WooCommerce_Priority_Processing
     add_option('wpp_allow_guests', '1');
 
     // Optionally schedule daily statistics refresh
-    if ($this->statistics) {
-      $this->statistics->schedule_daily_refresh();
+    if ($this->core_statistics) {
+      $this->core_statistics->schedule_daily_refresh();
     }
 
     error_log('WPP: Plugin activated successfully');
@@ -208,9 +199,9 @@ class WooCommerce_Priority_Processing
     }
 
     // Clear statistics cache
-    if ($this->statistics) {
-      $this->statistics->clear_cache();
-      $this->statistics->cleanup_scheduled_events();
+    if ($this->core_statistics) {
+      $this->core_statistics->clear_cache();
+      $this->core_statistics->cleanup_scheduled_events();
     }
 
     error_log('WPP: Plugin deactivated and cleaned up');
@@ -221,23 +212,23 @@ class WooCommerce_Priority_Processing
    */
   public function get_statistics()
   {
-    return $this->statistics;
+    return $this->core_statistics;
   }
 
   /**
-   * Get admin instance
+   * Get admin menu instance
    */
-  public function get_admin()
+  public function get_admin_menu()
   {
-    return $this->admin;
+    return $this->admin_menu;
   }
 
   /**
-   * Get order admin instance
+   * Get orders instance
    */
-  public function get_order_admin()
+  public function get_orders()
   {
-    return $this->order_admin;
+    return $this->core_orders;
   }
 }
 
