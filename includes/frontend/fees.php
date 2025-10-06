@@ -3,6 +3,8 @@
 /**
  * Frontend Fees Handler
  * Manages fee calculation and application during checkout
+ * 
+ * FIXED: Consistent session value checking with 'yes'/'no' format
  */
 class Frontend_Fees
 {
@@ -15,6 +17,7 @@ class Frontend_Fees
 
   /**
    * Add priority processing fee to cart
+   * FIXED: Consistent session value checking
    */
   public function add_priority_fee()
   {
@@ -36,12 +39,15 @@ class Frontend_Fees
 
     // Check session availability
     if (!WC()->session) {
+      error_log('WPP: Session not available in add_priority_fee');
       return;
     }
 
-    // Get priority state from session
-    $priority = WC()->session->get('priority_processing', false);
-    $should_add_fee = ($priority === true || $priority === 1 || $priority === '1');
+    // Get priority state from session - check for 'yes' string
+    $priority = WC()->session->get('priority_processing', 'no');
+    $should_add_fee = ($priority === 'yes' || $priority === true || $priority === '1' || $priority === 1);
+
+    error_log("WPP: add_priority_fee - Session value: {$priority}, Should add fee: " . ($should_add_fee ? 'YES' : 'NO'));
 
     if ($should_add_fee) {
       $this->apply_priority_fee();
@@ -58,11 +64,13 @@ class Frontend_Fees
 
     // Don't add fee if amount is zero or negative
     if ($fee_amount <= 0) {
+      error_log('WPP: Fee amount is zero or negative, not adding fee');
       return;
     }
 
     // Check if fee already exists to avoid duplicates
     if ($this->fee_already_exists($fee_label)) {
+      error_log('WPP: Fee already exists, skipping');
       return;
     }
 
@@ -76,6 +84,10 @@ class Frontend_Fees
    */
   private function fee_already_exists($fee_label)
   {
+    if (!WC()->cart) {
+      return false;
+    }
+
     $existing_fees = WC()->cart->get_fees();
 
     foreach ($existing_fees as $fee) {
@@ -89,6 +101,7 @@ class Frontend_Fees
 
   /**
    * Save priority processing data to order
+   * FIXED: Consistent session value checking
    */
   public function save_priority_to_order($order, $data)
   {
@@ -96,8 +109,12 @@ class Frontend_Fees
       return;
     }
 
-    $priority = WC()->session->get('priority_processing', false);
-    if ($priority === true || $priority === 1 || $priority === '1') {
+    $priority = WC()->session->get('priority_processing', 'no');
+    $should_save = ($priority === 'yes' || $priority === true || $priority === '1' || $priority === 1);
+
+    error_log("WPP: save_priority_to_order - Session value: {$priority}, Should save: " . ($should_save ? 'YES' : 'NO'));
+
+    if ($should_save) {
       $this->apply_priority_to_order($order);
     }
   }
@@ -151,55 +168,6 @@ class Frontend_Fees
   }
 
   /**
-   * Calculate fee amount based on cart contents (if needed for complex logic)
-   */
-  public function calculate_dynamic_fee()
-  {
-    $base_fee = floatval(get_option('wpp_fee_amount', '5.00'));
-    $cart_total = WC()->cart ? WC()->cart->get_subtotal() : 0;
-
-    // Example: could implement percentage-based fees or tiered pricing
-    // For now, just return the base fee
-    return $base_fee;
-  }
-
-  /**
-   * Get fee display information
-   */
-  public function get_fee_info()
-  {
-    return [
-      'amount' => floatval(get_option('wpp_fee_amount', '5.00')),
-      'label' => get_option('wpp_fee_label', 'Priority Processing & Express Shipping'),
-      'formatted_amount' => wc_price(get_option('wpp_fee_amount', '5.00')),
-      'is_enabled' => (get_option('wpp_enabled') === '1' || get_option('wpp_enabled') === 'yes')
-    ];
-  }
-
-  /**
-   * Remove priority processing fee (if needed)
-   */
-  public function remove_priority_fee()
-  {
-    if (!WC()->cart) {
-      return false;
-    }
-
-    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
-    $fees = WC()->cart->get_fees();
-
-    foreach ($fees as $fee_key => $fee) {
-      if ($fee->name === $fee_label) {
-        unset($fees[$fee_key]);
-        error_log("WPP: Priority fee removed from cart");
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
    * Check if priority processing is active in current session
    */
   private function is_priority_active()
@@ -208,34 +176,7 @@ class Frontend_Fees
       return false;
     }
 
-    $priority = WC()->session->get('priority_processing', false);
-    return ($priority === true || $priority === '1' || $priority === 1);
-  }
-
-  /**
-   * Get current cart total including priority fee
-   */
-  public function get_total_with_priority()
-  {
-    if (!WC()->cart) {
-      return 0;
-    }
-
-    $cart_total = WC()->cart->get_total('');
-    $priority_fee = $this->is_priority_active() ? floatval(get_option('wpp_fee_amount', '5.00')) : 0;
-
-    return $cart_total + $priority_fee;
-  }
-
-  /**
-   * Format fee for display
-   */
-  public function format_fee_display($amount, $include_symbol = true)
-  {
-    if ($include_symbol) {
-      return wc_price($amount);
-    }
-
-    return number_format($amount, 2);
+    $priority = WC()->session->get('priority_processing', 'no');
+    return ($priority === 'yes' || $priority === true || $priority === '1' || $priority === 1);
   }
 }
