@@ -1,171 +1,124 @@
 /**
  * Priority Processing - Frontend Styles
- * Styles for the priority processing checkout section
+ * Simplified version that will definitely load
  */
 
-/* Hide the auto-generated WooCommerce field wrapper */
-.wpp-priority-field-hidden {
-  display: none !important;
-}
-
-/* Priority Section Container */
+/* Main Priority Section */
 .wpp-priority-section {
-  background: #f8f9fa;
-  border: 2px solid #e1e8ed;
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
-  transition: all 0.3s ease;
+  background: #f8f9fa !important;
+  border: 2px solid #dee2e6 !important;
+  border-radius: 6px !important;
+  padding: 20px !important;
+  margin: 20px 0 !important;
+  box-sizing: border-box !important;
 }
 
 .wpp-priority-section:hover {
-  border-color: #0073aa;
-  box-shadow: 0 2px 8px rgba(0, 115, 170, 0.1);
+  border-color: #28a745 !important;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.1) !important;
 }
 
-/* Section Title */
+/* Section Title with Lightning Emoji */
 .wpp-priority-section h3 {
-  margin: 0 0 15px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3338;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  margin: 0 0 15px 0 !important;
+  color: #495057 !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
 }
 
-/* Priority Field Wrapper */
+/* Field Wrapper */
 .wpp-priority-field-wrapper {
-  margin: 0;
-  padding: 0;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-/* Checkbox Label */
+/* Label Container */
 .wpp-priority-label {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  cursor: pointer;
-  font-size: 15px;
-  line-height: 1.5;
-  margin: 0;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  cursor: pointer !important;
+  margin: 0 !important;
 }
 
-.wpp-priority-label input[type="checkbox"] {
-  margin: 3px 0 0 0;
-  cursor: pointer;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
+/* Checkbox */
+.wpp-priority-checkbox {
+  margin: 2px 0 0 0 !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  width: 18px !important;
+  height: 18px !important;
 }
 
 /* Label Content */
 .wpp-label-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
 }
 
-/* Price Display */
+.wpp-label-content strong {
+  color: #28a745 !important;
+  font-weight: 600 !important;
+  display: block !important;
+  font-size: 14px !important;
+}
+
+/* Price in Strong */
 .wpp-price {
-  color: #0073aa;
-  font-weight: 600;
-  white-space: nowrap;
-  margin-left: 5px;
+  color: #dc3545 !important;
+  font-weight: 600 !important;
+  margin-left: 5px !important;
 }
 
 /* Description */
-.wpp-priority-section .description {
-  display: block;
-  margin: 0;
-  font-size: 13px;
-  color: #646970;
-  font-style: italic;
-  font-weight: normal;
+.wpp-label-content .description {
+  color: #6c757d !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  display: block !important;
 }
 
 /* Checked State */
-.wpp-priority-label input[type="checkbox"]:checked~.wpp-label-content strong {
-  color: #00a32a;
-}
-
-.wpp-priority-label input[type="checkbox"]:checked~.wpp-label-content .wpp-price {
-  color: #00a32a;
+.wpp-priority-checkbox:checked+.wpp-label-content strong {
+  color: #155724 !important;
 }
 
 /* Loading State */
-.woocommerce-checkout.processing .wpp-priority-section {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-/* Error Messages */
-.wpp-error-message {
-  margin: 15px 0;
-  padding: 12px 15px;
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  color: #721c24;
+.processing .wpp-priority-section {
+  opacity: 0.6 !important;
+  pointer-events: none !important;
 }
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .wpp-priority-section {
-    padding: 15px;
-    margin: 15px 0;
+    padding: 15px !important;
+    margin: 15px 0 !important;
   }
 
   .wpp-priority-section h3 {
-    font-size: 16px;
-    margin-bottom: 12px;
+    font-size: 14px !important;
   }
 
-  .wpp-priority-label {
-    font-size: 14px;
+  .wpp-label-content strong {
+    font-size: 13px !important;
   }
 
-  .wpp-price {
-    display: inline-block;
-    margin-top: 0;
+  .wpp-label-content .description {
+    font-size: 12px !important;
   }
 }
 
-/* WooCommerce Block Checkout Specific */
-.wp-block-woocommerce-checkout .wpp-priority-section {
-  margin-top: 25px;
+/* Focus for Accessibility */
+.wpp-priority-checkbox:focus {
+  outline: 2px solid #28a745 !important;
+  outline-offset: 2px !important;
 }
 
-/* Accessibility */
-.wpp-priority-label input[type="checkbox"]:focus {
-  outline: 2px solid #0073aa;
-  outline-offset: 2px;
-}
-
-.wpp-priority-label:hover {
-  opacity: 0.9;
-}
-
-.wpp-priority-label:hover .wpp-label-content strong {
-  color: #0073aa;
-}
-
-/* Animation for checkbox state change */
-@keyframes checkboxCheck {
-  0% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.1);
-  }
-
-  100% {
-    transform: scale(1);
-  }
-}
-
-.wpp-priority-label input[type="checkbox"]:checked {
-  animation: checkboxCheck 0.3s ease;
+/* Hide any WooCommerce auto-generated field */
+.wpp-priority-field-hidden {
+  display: none !important;
 }
