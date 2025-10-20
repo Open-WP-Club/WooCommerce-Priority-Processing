@@ -1,199 +1,118 @@
-jQuery(document).ready(function($) {
-    console.log('WPP: Fixed frontend script loaded');
-    
-    var isUpdating = false;
-    var lastKnownState = null;
-    
-    // Get current checkbox state
-    function getCurrentCheckboxState() {
-        var $checkbox = $('.wpp-priority-checkbox:first');
-        return $checkbox.length > 0 ? $checkbox.is(':checked') : false;
-    }
-    
-    // Sync all checkboxes to a specific state
-    function setAllCheckboxes(state) {
-        $('.wpp-priority-checkbox').prop('checked', state);
-        console.log('WPP: Set all checkboxes to:', state);
-    }
-    
-    // Block the checkout form
-    function blockCheckout() {
-        if ($('form.checkout').length) {
-            $('form.checkout').block({
-                message: 'Updating priority processing...',
-                overlayCSS: {
-                    background: '#fff',
-                    opacity: 0.6
-                }
-            });
-        }
-        $('.wpp-priority-checkbox').prop('disabled', true);
-        isUpdating = true;
-        console.log('WPP: Checkout blocked');
-    }
-    
-    // Unblock the checkout form
-    function unblockCheckout() {
-        if ($('form.checkout').length) {
-            $('form.checkout').unblock();
-        }
-        $('.wpp-priority-checkbox').prop('disabled', false);
-        isUpdating = false;
-        console.log('WPP: Checkout unblocked');
-    }
-    
-    // Force checkout update by triggering WooCommerce's update mechanism
-    function triggerCheckoutUpdate() {
-        console.log('WPP: Triggering checkout update');
-        
-        // Method 1: Trigger the standard WooCommerce checkout update
-        $('body').trigger('update_checkout');
-        
-        // Method 2: If that doesn't work, trigger input changes
-        setTimeout(function() {
-            $('form.checkout').find('input, select').first().trigger('change');
-        }, 100);
-    }
-    
-    // Handle checkbox state changes
-    $(document).on('change', '.wpp-priority-checkbox', function(e) {
-        // Prevent multiple simultaneous updates
-        if (isUpdating) {
-            console.log('WPP: Update in progress, preventing change');
-            e.preventDefault();
-            return false;
-        }
-        
-        var $clickedCheckbox = $(this);
-        var newState = $clickedCheckbox.is(':checked');
-        var checkboxId = $clickedCheckbox.attr('id') || 'unknown';
-        
-        console.log('WPP: Checkbox changed:', checkboxId, 'new state:', newState);
-        
-        // Store the original state for rollback
-        var originalState = lastKnownState;
-        lastKnownState = newState;
-        
-        // Immediately sync all checkboxes
-        setAllCheckboxes(newState);
-        
-        // Block the checkout
-        blockCheckout();
-        
-        // Prepare AJAX data
-        var ajaxData = {
-            action: 'wpp_update_priority',
-            priority: newState ? '1' : '0',
-            nonce: wpp_ajax.nonce
-        };
-        
-        console.log('WPP: Sending AJAX request:', ajaxData);
-        
-        // Send AJAX request
-        $.ajax({
-            type: 'POST',
-            url: wpp_ajax.ajax_url,
-            data: ajaxData,
-            timeout: 10000,
-            success: function(response) {
-                console.log('WPP: AJAX Success:', response);
-                
-                if (response.success) {
-                    // Log debug information
-                    if (response.data && response.data.debug) {
-                        console.log('WPP: Server debug:', response.data.debug);
-                    }
-                    
-                    // Update fragments if provided
-                    if (response.data && response.data.fragments) {
-                        console.log('WPP: Updating fragments');
-                        $.each(response.data.fragments, function(selector, html) {
-                            $(selector).replaceWith(html);
-                        });
-                    }
-                    
-                    // Force a complete checkout refresh
-                    triggerCheckoutUpdate();
-                    
-                    console.log('WPP: Update successful');
-                } else {
-                    console.error('WPP: Server error:', response);
-                    
-                    // Rollback checkbox state
-                    lastKnownState = originalState;
-                    setAllCheckboxes(originalState);
-                    
-                    alert('Failed to update priority processing. Please try again.');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('WPP: AJAX Error:', {
-                    status: status,
-                    error: error,
-                    response: xhr.responseText
-                });
-                
-                // Rollback checkbox state
-                lastKnownState = originalState;
-                setAllCheckboxes(originalState);
-                
-                alert('Connection error. Please check your internet connection and try again.');
-            },
-            complete: function() {
-                console.log('WPP: AJAX Complete');
-                
-                // Always unblock the checkout
-                setTimeout(function() {
-                    unblockCheckout();
-                }, 500);
-            }
-        });
+/**
+ * Priority Processing - Frontend Block Checkout Handler
+ * Handles real-time AJAX updates for priority processing checkbox
+ */
+(function($) {
+  'use strict';
+
+  // Wait for DOM to be ready
+  $(document).ready(function() {
+    initPriorityProcessing();
+  });
+
+  /**
+   * Initialize priority processing functionality
+   */
+  function initPriorityProcessing() {
+    // Handle checkbox change
+    $(document).on('change', '#priority_processing, input[name="priority_processing"]', function() {
+      handlePriorityChange($(this).is(':checked'));
     });
-    
-    // Handle WooCommerce checkout updates
+
+    // Listen for WooCommerce checkout updates
     $(document.body).on('updated_checkout', function() {
-        console.log('WPP: Checkout updated event received');
-        
-        // Wait a bit for DOM to settle, then sync checkboxes
-        setTimeout(function() {
-            if (!isUpdating) {
-                var currentState = getCurrentCheckboxState();
-                
-                if (lastKnownState !== null && currentState !== lastKnownState) {
-                    console.log('WPP: State mismatch detected. Restoring to:', lastKnownState);
-                    setAllCheckboxes(lastKnownState);
-                } else {
-                    console.log('WPP: Checkbox state is consistent:', currentState);
-                    lastKnownState = currentState;
-                }
-            }
-        }, 100);
+      // Re-bind events after checkout updates
+      bindCheckboxEvents();
     });
-    
-    // Initialize state tracking
-    setTimeout(function() {
-        lastKnownState = getCurrentCheckboxState();
-        console.log('WPP: Initial state set to:', lastKnownState);
-    }, 500);
-    
-    // Monitor for checkbox inconsistencies
-    setInterval(function() {
-        if (!isUpdating) {
-            var $checkboxes = $('.wpp-priority-checkbox');
-            if ($checkboxes.length > 0) {
-                var checkedCount = $checkboxes.filter(':checked').length;
-                var totalCount = $checkboxes.length;
-                
-                // Check for partial selection (inconsistency)
-                if (checkedCount > 0 && checkedCount < totalCount) {
-                    console.warn('WPP: Checkbox inconsistency detected, syncing to first checkbox');
-                    var firstState = $checkboxes.first().is(':checked');
-                    setAllCheckboxes(firstState);
-                    lastKnownState = firstState;
-                }
-            }
+  }
+
+  /**
+   * Bind checkbox events
+   */
+  function bindCheckboxEvents() {
+    $('input[name="priority_processing"]').off('change').on('change', function() {
+      handlePriorityChange($(this).is(':checked'));
+    });
+  }
+
+  /**
+   * Handle priority processing change
+   */
+  function handlePriorityChange(isChecked) {
+    // Show loading indicator
+    showLoadingIndicator();
+
+    // Send AJAX request
+    $.ajax({
+      url: wppData.ajax_url,
+      type: 'POST',
+      data: {
+        action: 'wpp_update_priority',
+        nonce: wppData.nonce,
+        priority_enabled: isChecked
+      },
+      success: function(response) {
+        if (response.success) {
+          // Trigger checkout update to refresh totals
+          $(document.body).trigger('update_checkout');
+        } else {
+          console.error('Priority update failed:', response.data.message);
+          showErrorMessage(response.data.message);
         }
-    }, 2000);
-    
-    console.log('WPP: Fixed frontend script initialization complete');
-});
+      },
+      error: function(xhr, status, error) {
+        console.error('AJAX error:', error);
+        showErrorMessage('An error occurred. Please try again.');
+      },
+      complete: function() {
+        hideLoadingIndicator();
+      }
+    });
+  }
+
+  /**
+   * Show loading indicator
+   */
+  function showLoadingIndicator() {
+    // Block the checkout form
+    $('.woocommerce-checkout').block({
+      message: null,
+      overlayCSS: {
+        background: '#fff',
+        opacity: 0.6
+      }
+    });
+  }
+
+  /**
+   * Hide loading indicator
+   */
+  function hideLoadingIndicator() {
+    $('.woocommerce-checkout').unblock();
+  }
+
+  /**
+   * Show error message
+   */
+  function showErrorMessage(message) {
+    // Remove any existing error messages
+    $('.wpp-error-message').remove();
+
+    // Add error message
+    var errorHtml = '<div class="woocommerce-error wpp-error-message">' + message + '</div>';
+    $('.woocommerce-checkout').prepend(errorHtml);
+
+    // Scroll to error
+    $('html, body').animate({
+      scrollTop: $('.wpp-error-message').offset().top - 100
+    }, 500);
+
+    // Auto-remove after 5 seconds
+    setTimeout(function() {
+      $('.wpp-error-message').fadeOut(400, function() {
+        $(this).remove();
+      });
+    }, 5000);
+  }
+
+})(jQuery);

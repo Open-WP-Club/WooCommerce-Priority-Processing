@@ -1,13 +1,121 @@
 <?php
 
 /**
- * Core Permission Handler
- * Handles user role-based access control for priority processing feature
+ * Core Permissions Handler
+ * Manages access control for priority processing feature
  */
 class Core_Permissions
 {
   /**
-   * Get allowed user roles as array (ensures proper format)
+   * Check if current user can access priority processing
+   * 
+   * @return bool
+   */
+  public static function can_access_priority_processing()
+  {
+    // Shop managers and administrators always have access
+    if (current_user_can('manage_woocommerce') || current_user_can('administrator')) {
+      return true;
+    }
+
+    // Get allowed user roles
+    $allowed_roles = self::get_allowed_user_roles();
+
+    // Check if guests are allowed
+    $allow_guests = get_option('wpp_allow_guests', '1');
+
+    // If user is not logged in
+    if (!is_user_logged_in()) {
+      return $allow_guests === '1' || $allow_guests === 'yes';
+    }
+
+    // Get current user
+    $user = wp_get_current_user();
+
+    // If no roles are set, allow all logged-in users
+    if (empty($allowed_roles)) {
+      return true;
+    }
+
+    // Check if user has any of the allowed roles
+    if (!empty($user->roles)) {
+      foreach ($user->roles as $role) {
+        if (in_array($role, $allowed_roles)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a specific user ID can access priority processing
+   * 
+   * @param int $user_id User ID to check
+   * @return bool
+   */
+  public static function user_can_access($user_id)
+  {
+    if (empty($user_id)) {
+      return self::can_access_priority_processing();
+    }
+
+    $user = get_user_by('id', $user_id);
+    if (!$user) {
+      return false;
+    }
+
+    // Check for admin/shop manager capabilities
+    if (user_can($user_id, 'manage_woocommerce') || user_can($user_id, 'administrator')) {
+      return true;
+    }
+
+    $allowed_roles = self::get_allowed_user_roles();
+
+    // If no roles are set, allow all users
+    if (empty($allowed_roles)) {
+      return true;
+    }
+
+    // Check if user has any of the allowed roles
+    if (!empty($user->roles)) {
+      foreach ($user->roles as $role) {
+        if (in_array($role, $allowed_roles)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Get list of all available user roles
+   * 
+   * @return array
+   */
+  public static function get_available_roles()
+  {
+    global $wp_roles;
+
+    if (!isset($wp_roles)) {
+      $wp_roles = new WP_Roles();
+    }
+
+    $roles = [];
+    foreach ($wp_roles->get_names() as $role_slug => $role_name) {
+      $roles[$role_slug] = $role_name;
+    }
+
+    return $roles;
+  }
+
+  /**
+   * Get allowed user roles as array (for settings page)
+   * Ensures proper format
+   * 
+   * @return array
    */
   public static function get_allowed_user_roles()
   {
@@ -24,42 +132,9 @@ class Core_Permissions
   }
 
   /**
-   * Check if current user can access priority processing
-   */
-  public static function can_access_priority_processing()
-  {
-    // Shop managers and administrators always have access
-    if (current_user_can('manage_woocommerce') || current_user_can('administrator')) {
-      return true;
-    }
-
-    // Get permission settings
-    $allowed_roles = self::get_allowed_user_roles();
-    $allow_guests = get_option('wpp_allow_guests', '1');
-
-    // Handle guest users
-    if (!is_user_logged_in()) {
-      return $allow_guests === '1';
-    }
-
-    // Get current user's roles
-    $current_user = wp_get_current_user();
-    $user_roles = $current_user->roles;
-
-    // Check if user has any of the allowed roles
-    if (!empty($allowed_roles)) {
-      foreach ($user_roles as $role) {
-        if (in_array($role, $allowed_roles)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Get all available user roles for the settings
+   * Get all available user roles for the settings (excludes admin roles)
+   * 
+   * @return array
    */
   public static function get_available_user_roles()
   {
@@ -82,6 +157,8 @@ class Core_Permissions
 
   /**
    * Get current permission summary for admin display
+   * 
+   * @return array
    */
   public static function get_permission_summary()
   {
@@ -91,7 +168,7 @@ class Core_Permissions
     $summary = [];
 
     // Always include shop managers
-    $summary[] = __('Shop Managers', 'woo-priority');
+    $summary[] = __('Shop Managers & Administrators', 'woo-priority');
 
     // Add selected roles
     $available_roles = self::get_available_user_roles();
@@ -107,54 +184,5 @@ class Core_Permissions
     }
 
     return $summary;
-  }
-
-  /**
-   * Log permission check for debugging
-   */
-  public static function log_permission_check($context = '')
-  {
-    if (!defined('WP_DEBUG') || !WP_DEBUG) {
-      return;
-    }
-
-    $user_info = is_user_logged_in() ?
-      'User ID: ' . get_current_user_id() . ', Roles: ' . implode(', ', wp_get_current_user()->roles) :
-      'Guest user';
-
-    $allowed_roles = self::get_allowed_user_roles();
-    $allow_guests = get_option('wpp_allow_guests', '1');
-    $has_access = self::can_access_priority_processing();
-
-    error_log("WPP Permission Check [{$context}]: {$user_info} | Allowed roles: " . implode(', ', $allowed_roles) . " | Allow guests: {$allow_guests} | Access granted: " . ($has_access ? 'YES' : 'NO'));
-  }
-
-  /**
-   * Validate permission for AJAX requests
-   */
-  public static function validate_ajax_permission()
-  {
-    if (!self::can_access_priority_processing()) {
-      self::log_permission_check('ajax_validation');
-      wp_send_json_error([
-        'message' => __('You do not have permission to access priority processing.', 'woo-priority'),
-        'code' => 'permission_denied'
-      ]);
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Get permission settings for admin display
-   */
-  public static function get_permission_settings()
-  {
-    return [
-      'allowed_roles' => self::get_allowed_user_roles(),
-      'allow_guests' => get_option('wpp_allow_guests', '1'),
-      'available_roles' => self::get_available_user_roles(),
-      'summary' => self::get_permission_summary()
-    ];
   }
 }

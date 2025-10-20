@@ -28,9 +28,8 @@ class Frontend_Fees
       return;
     }
 
-    // Check user permissions
+    // Check user permissions (removed log_permission_check call)
     if (!Core_Permissions::can_access_priority_processing()) {
-      Core_Permissions::log_permission_check('add_priority_fee');
       return;
     }
 
@@ -68,7 +67,6 @@ class Frontend_Fees
 
     // Add the fee to cart
     WC()->cart->add_fee($fee_label, $fee_amount);
-    error_log("WPP: Priority fee added to cart: {$fee_amount}");
   }
 
   /**
@@ -118,36 +116,10 @@ class Frontend_Fees
     $order->update_meta_data('_priority_fee_amount', $fee_amount);
     $order->update_meta_data('_priority_service_level', 'express');
 
-    // Check if order already has the priority processing fee
-    $this->validate_order_fee($order, $fee_label);
-
     // Fire action hook for shipping plugins that might want to integrate
     do_action('wpp_priority_order_created', $order, $fee_amount);
 
     $order->save();
-
-    error_log("WPP: Priority processing saved to order #{$order->get_id()} with fee amount: {$fee_amount}");
-  }
-
-  /**
-   * Validate that the order has the correct priority fee
-   */
-  private function validate_order_fee($order, $fee_label)
-  {
-    $order_fees = $order->get_fees();
-    $priority_fee_exists = false;
-
-    foreach ($order_fees as $fee) {
-      if ($fee->get_name() === $fee_label) {
-        $priority_fee_exists = true;
-        error_log('WPP: Priority fee confirmed in order: ' . $fee->get_name());
-        break;
-      }
-    }
-
-    if (!$priority_fee_exists) {
-      error_log('WPP: WARNING - Priority fee not found in order #' . $order->get_id());
-    }
   }
 
   /**
@@ -191,7 +163,6 @@ class Frontend_Fees
     foreach ($fees as $fee_key => $fee) {
       if ($fee->name === $fee_label) {
         unset($fees[$fee_key]);
-        error_log("WPP: Priority fee removed from cart");
         return true;
       }
     }
