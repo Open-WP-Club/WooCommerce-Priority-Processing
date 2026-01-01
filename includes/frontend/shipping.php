@@ -8,65 +8,89 @@ class Frontend_Shipping
 {
   public function __construct()
   {
-    // IMPORTANT: Shipping package modification is DISABLED by default
-    // It can cause shipping methods to disappear on some setups
-    // Use the filter 'wpp_modify_shipping_packages' to enable if needed
-    add_filter('woocommerce_cart_shipping_packages', [$this, 'add_priority_metadata_to_packages'], 999);
-
     // Hook into specific shipping plugin API calls (safe, non-intrusive)
     add_action('init', [$this, 'setup_shipping_plugin_hooks']);
+
+    // Add early hook to ensure session is set before packages are built
+    add_action('woocommerce_checkout_update_order_review', [$this, 'ensure_priority_session_before_shipping'], 5);
+
+    // MAIN APPROACH: Add priority fee directly to shipping rates
+    add_filter('woocommerce_package_rates', [$this, 'add_priority_to_shipping_rates'], 100, 2);
   }
 
   /**
-   * SAFE: Only add metadata to packages - doesn't modify shipping calculations
-   * 
-   * IMPORTANT: This method is disabled by default because it can cause shipping methods
-   * to disappear on some setups. The priority fee is handled via API request hooks instead.
+   * Ensure priority session is set before shipping packages are calculated
+   * This runs early in the checkout update process to avoid shipping methods disappearing
    */
-  public function add_priority_metadata_to_packages($packages)
+  public function ensure_priority_session_before_shipping($post_data = '')
   {
-    // Check if package modification is enabled (disabled by default to prevent issues)
-    $modify_packages = apply_filters('wpp_modify_shipping_packages', false);
-
-    if (!$modify_packages) {
-      error_log("WPP: Shipping package modification disabled (use filter 'wpp_modify_shipping_packages' to enable)");
-      return $packages;
+    if (!WC()->session) {
+      return;
     }
 
-    // Only add metadata if priority processing is active
+    // Parse the post data if it's a string
+    $posted_data = [];
+    if (is_string($post_data) && !empty($post_data)) {
+      parse_str($post_data, $posted_data);
+    } elseif (is_array($post_data)) {
+      $posted_data = $post_data;
+    }
+
+    // Check if priority processing checkbox is checked in the posted data
+    $priority_enabled = false;
+
+    if (isset($posted_data['priority_processing']) && $posted_data['priority_processing'] === '1') {
+      $priority_enabled = true;
+    } elseif (isset($_POST['priority_processing']) && $_POST['priority_processing'] === '1') {
+      $priority_enabled = true;
+    }
+
+    // Update session BEFORE shipping is calculated
+    WC()->session->set('priority_processing', $priority_enabled);
+
+    error_log("WPP: Priority session set to " . ($priority_enabled ? 'true' : 'false') . " before shipping calculation");
+  }
+
+  /**
+   * Add priority fee directly to shipping rates
+   * This is the main method - fee is included in shipping cost, not as separate line item
+   */
+  public function add_priority_to_shipping_rates($rates, $package)
+  {
+    // Only modify rates if priority processing is active
     if (!$this->is_priority_processing_active()) {
-      return $packages;
+      return $rates;
     }
 
     $priority_fee = floatval(get_option('wpp_fee_amount', '5.00'));
 
     if ($priority_fee <= 0) {
-      return $packages;
+      return $rates;
     }
 
-    error_log("WPP: Adding priority metadata to shipping packages (fee: {$priority_fee})");
+    error_log("WPP: Adding {$priority_fee} to " . count($rates) . " shipping rates");
 
-    // Create a new array to avoid reference issues
-    $modified_packages = [];
+    // Modify each shipping rate to include the priority fee
+    foreach ($rates as $rate_key => $rate) {
+      // Add the priority fee to the shipping cost
+      $original_cost = $rate->cost;
+      $rates[$rate_key]->cost = $original_cost + $priority_fee;
 
-    foreach ($packages as $package_key => $package) {
-      // Clone the package to avoid modifying the original
-      $modified_package = $package;
+      // Optional: Update the label to indicate priority is included
+      $show_priority_in_label = apply_filters('wpp_show_priority_in_shipping_label', false);
+      if ($show_priority_in_label) {
+        $rates[$rate_key]->label = $rate->label . ' ' . __('(Priority)', 'woo-priority');
+      }
 
-      // Add priority metadata without modifying core package properties
-      $modified_package['wpp_priority_processing'] = [
-        'enabled' => true,
-        'fee_amount' => $priority_fee,
-        'service_level' => 'express',
-        'requires_priority_handling' => true
-      ];
+      // Add metadata for tracking
+      $rates[$rate_key]->add_meta_data('wpp_priority_processing', 'yes', true);
+      $rates[$rate_key]->add_meta_data('wpp_priority_fee_added', $priority_fee, true);
+      $rates[$rate_key]->add_meta_data('wpp_original_cost', $original_cost, true);
 
-      $modified_packages[$package_key] = $modified_package;
-
-      error_log("WPP: Added priority metadata to package {$package_key}");
+      error_log("WPP: Modified rate '{$rate->label}': {$original_cost} -> " . $rates[$rate_key]->cost);
     }
 
-    return $modified_packages;
+    return $rates;
   }
 
   /**

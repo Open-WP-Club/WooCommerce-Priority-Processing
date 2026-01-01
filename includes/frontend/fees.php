@@ -8,81 +8,11 @@ class Frontend_Fees
 {
   public function __construct()
   {
-    // Fee calculation and application
-    add_action('woocommerce_cart_calculate_fees', [$this, 'add_priority_fee']);
+    // NOTE: We NO LONGER add a separate cart fee
+    // The priority fee is added directly to shipping rates in Frontend_Shipping class
+    // This class now only handles saving priority status to orders
+
     add_action('woocommerce_checkout_create_order', [$this, 'save_priority_to_order'], 10, 2);
-  }
-
-  /**
-   * Add priority processing fee to cart
-   */
-  public function add_priority_fee()
-  {
-    // Only process on checkout pages
-    if (!is_checkout()) {
-      return;
-    }
-
-    // Check if feature is enabled
-    if (get_option('wpp_enabled') !== 'yes' && get_option('wpp_enabled') !== '1') {
-      return;
-    }
-
-    // Check user permissions (removed log_permission_check call)
-    if (!Core_Permissions::can_access_priority_processing()) {
-      return;
-    }
-
-    // Check session availability
-    if (!WC()->session) {
-      return;
-    }
-
-    // Get priority state from session
-    $priority = WC()->session->get('priority_processing', false);
-    $should_add_fee = ($priority === true || $priority === 1 || $priority === '1');
-
-    if ($should_add_fee) {
-      $this->apply_priority_fee();
-    }
-  }
-
-  /**
-   * Apply the priority processing fee
-   */
-  private function apply_priority_fee()
-  {
-    $fee_amount = floatval(get_option('wpp_fee_amount', '5.00'));
-    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
-
-    // Don't add fee if amount is zero or negative
-    if ($fee_amount <= 0) {
-      return;
-    }
-
-    // Check if fee already exists to avoid duplicates
-    if ($this->fee_already_exists($fee_label)) {
-      return;
-    }
-
-    // Add the fee to cart
-    WC()->cart->add_fee($fee_label, $fee_amount);
-  }
-
-  /**
-   * Check if priority fee already exists in cart
-   */
-  private function fee_already_exists($fee_label)
-  {
-    $existing_fees = WC()->cart->get_fees();
-
-    foreach ($existing_fees as $fee) {
-      if ($fee->name === $fee_label) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   /**

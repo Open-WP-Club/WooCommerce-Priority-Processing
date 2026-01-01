@@ -53,8 +53,18 @@
       },
       success: function(response) {
         if (response.success) {
-          // Trigger checkout update to refresh totals
-          $(document.body).trigger('update_checkout');
+          // Update fragments if available (for classic checkout)
+          if (response.data.fragments) {
+            $.each(response.data.fragments, function(key, value) {
+              $(key).replaceWith(value);
+            });
+          }
+
+          // Trigger checkout update AFTER a small delay to prevent race conditions
+          // This allows the session to be fully updated before shipping recalculates
+          setTimeout(function() {
+            $(document.body).trigger('update_checkout');
+          }, 100);
         } else {
           console.error('Priority update failed:', response.data.message);
           showErrorMessage(response.data.message);
@@ -65,7 +75,10 @@
         showErrorMessage('An error occurred. Please try again.');
       },
       complete: function() {
-        hideLoadingIndicator();
+        // Hide loading indicator after a brief delay to ensure update completes
+        setTimeout(function() {
+          hideLoadingIndicator();
+        }, 150);
       }
     });
   }
