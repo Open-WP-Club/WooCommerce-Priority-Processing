@@ -8,7 +8,6 @@
   // Wait for WooCommerce Blocks to be ready
   const initializeWhenReady = () => {
     const { registerCheckoutBlock } = window.wc?.blocksCheckout || {};
-    const { ExperimentalOrderMeta } = window.wc?.blocksCheckout || {};
     const { CheckboxControl } = window.wp?.components || {};
     const { createElement, useState, useEffect } = window.wp?.element || {};
     const { __ } = window.wp?.i18n || {};
@@ -61,7 +60,7 @@
           body: new URLSearchParams({
             action: 'wpp_update_priority',
             nonce: wppBlocksData?.nonce || '',
-            priority_enabled: checked ? '1' : '0'
+            priority_enabled: checked ? 'true' : 'false'
           })
         })
         .then(response => response.json())
@@ -69,6 +68,17 @@
           if (!data.success) {
             console.error('WPP: Failed to update priority processing', data);
             setIsChecked(!checked); // Revert on error
+
+            // Show user-facing error notification
+            if (window.wp?.data?.dispatch) {
+              const noticesStore = window.wp.data.dispatch('core/notices');
+              if (noticesStore && typeof noticesStore.createErrorNotice === 'function') {
+                noticesStore.createErrorNotice(
+                  'Unable to update priority processing. Please try again.',
+                  { type: 'snackbar', isDismissible: true }
+                );
+              }
+            }
           } else {
             // Trigger a cart update to refresh totals
             if (window.wp?.data?.dispatch) {
@@ -86,6 +96,17 @@
         .catch(error => {
           console.error('WPP: Error updating priority processing:', error);
           setIsChecked(!checked); // Revert on error
+
+          // Show user-facing error notification
+          if (window.wp?.data?.dispatch) {
+            const noticesStore = window.wp.data.dispatch('core/notices');
+            if (noticesStore && typeof noticesStore.createErrorNotice === 'function') {
+              noticesStore.createErrorNotice(
+                'Unable to update priority processing. Please try again.',
+                { type: 'snackbar', isDismissible: true }
+              );
+            }
+          }
         })
         .finally(() => {
           setIsProcessing(false);

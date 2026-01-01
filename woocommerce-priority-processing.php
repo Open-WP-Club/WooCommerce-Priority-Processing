@@ -60,72 +60,72 @@ class WooCommerce_Priority_Processing {
 	/**
 	 * Admin menu instance
 	 *
-	 * @var Admin_Menu
+	 * @var Admin_Menu|null
 	 */
-	public Admin_Menu $admin_menu;
+	public ?Admin_Menu $admin_menu = null;
 
 	/**
 	 * Admin settings instance
 	 *
-	 * @var Admin_Settings
+	 * @var Admin_Settings|null
 	 */
-	public Admin_Settings $admin_settings;
+	public ?Admin_Settings $admin_settings = null;
 
 	/**
 	 * Admin dashboard instance
 	 *
-	 * @var Admin_Dashboard
+	 * @var Admin_Dashboard|null
 	 */
-	public Admin_Dashboard $admin_dashboard;
+	public ?Admin_Dashboard $admin_dashboard = null;
 
 	/**
 	 * Frontend checkout instance
 	 *
-	 * @var Frontend_Checkout
+	 * @var Frontend_Checkout|null
 	 */
-	public Frontend_Checkout $frontend_checkout;
+	public ?Frontend_Checkout $frontend_checkout = null;
 
 	/**
 	 * Frontend AJAX instance
 	 *
-	 * @var Frontend_AJAX
+	 * @var Frontend_AJAX|null
 	 */
-	public Frontend_AJAX $frontend_ajax;
+	public ?Frontend_AJAX $frontend_ajax = null;
 
 	/**
 	 * Frontend fees instance
 	 *
-	 * @var Frontend_Fees
+	 * @var Frontend_Fees|null
 	 */
-	public Frontend_Fees $frontend_fees;
+	public ?Frontend_Fees $frontend_fees = null;
 
 	/**
 	 * Frontend shipping instance
 	 *
-	 * @var Frontend_Shipping
+	 * @var Frontend_Shipping|null
 	 */
-	public Frontend_Shipping $frontend_shipping;
+	public ?Frontend_Shipping $frontend_shipping = null;
 
 	/**
 	 * Frontend blocks integration instance
 	 *
-	 * @var Frontend_Blocks_Integration
+	 * @var Frontend_Blocks_Integration|null
 	 */
-	public Frontend_Blocks_Integration $frontend_blocks;
+	public ?Frontend_Blocks_Integration $frontend_blocks = null;
 
 	/**
 	 * Core orders instance
 	 *
-	 * @var Core_Orders
+	 * @var Core_Orders|null
 	 */
-	public Core_Orders $core_orders;
+	public ?Core_Orders $core_orders = null;
 
 	/**
 	 * Core statistics instance
 	 *
-	 * @var Core_Statistics
+	 * @var Core_Statistics|null
 	 */
-	public Core_Statistics $core_statistics;
+	public ?Core_Statistics $core_statistics = null;
 
 	/**
 	 * Get singleton instance
@@ -226,10 +226,6 @@ class WooCommerce_Priority_Processing {
 		// Add cleanup hooks.
 		add_action( 'woocommerce_cart_emptied', array( $this, 'clear_priority_session' ) );
 		add_action( 'wp_logout', array( $this, 'clear_priority_session' ) );
-
-		// Plugin activation/deactivation hooks.
-		register_activation_hook( __FILE__, array( $this, 'on_activation' ) );
-		register_deactivation_hook( __FILE__, array( $this, 'on_deactivation' ) );
 	}
 
 	/**
@@ -284,6 +280,9 @@ class WooCommerce_Priority_Processing {
 	public function clear_priority_session(): void {
 		if ( WC()->session ) {
 			WC()->session->set( 'priority_processing', false );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WPP: Priority session cleared by main class' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 		}
 	}
 
@@ -293,7 +292,7 @@ class WooCommerce_Priority_Processing {
 	 * @since 1.0.0
 	 * @return void
 	 */
-	public function on_activation(): void {
+	public static function on_activation(): void {
 		// Create default options.
 		$defaults = array(
 			'wpp_enabled'            => '0',
@@ -310,8 +309,13 @@ class WooCommerce_Priority_Processing {
 			add_option( $option_name, $default_value );
 		}
 
-		// Flush rewrite rules.
-		flush_rewrite_rules();
+		// Initialize statistics scheduling on activation, if available.
+		if ( class_exists( 'Core_Statistics' ) ) {
+			$statistics = new Core_Statistics();
+			if ( method_exists( $statistics, 'schedule_daily_refresh' ) ) {
+				$statistics->schedule_daily_refresh();
+			}
+		}
 	}
 
 	/**
@@ -320,29 +324,31 @@ class WooCommerce_Priority_Processing {
 	 * @since 1.0.0
 	 * @return void
 	 */
-	public function on_deactivation(): void {
+	public static function on_deactivation(): void {
 		// Clear any sessions.
 		if ( class_exists( 'WooCommerce' ) && WC()->session ) {
 			WC()->session->set( 'priority_processing', false );
 		}
 
 		// Clear statistics cache if available.
-		if ( isset( $this->core_statistics ) ) {
-			$this->core_statistics->clear_cache();
-			$this->core_statistics->cleanup_scheduled_events();
+		if ( class_exists( 'Core_Statistics' ) ) {
+			$statistics = new Core_Statistics();
+			if ( method_exists( $statistics, 'clear_cache' ) ) {
+				$statistics->clear_cache();
+			}
+			if ( method_exists( $statistics, 'cleanup_scheduled_events' ) ) {
+				$statistics->cleanup_scheduled_events();
+			}
 		}
-
-		// Flush rewrite rules.
-		flush_rewrite_rules();
 	}
 
 	/**
 	 * Get statistics instance
 	 *
 	 * @since 1.0.0
-	 * @return Core_Statistics
+	 * @return Core_Statistics|null
 	 */
-	public function get_statistics(): Core_Statistics {
+	public function get_statistics(): ?Core_Statistics {
 		return $this->core_statistics;
 	}
 
@@ -350,9 +356,9 @@ class WooCommerce_Priority_Processing {
 	 * Get admin menu instance
 	 *
 	 * @since 1.0.0
-	 * @return Admin_Menu
+	 * @return Admin_Menu|null
 	 */
-	public function get_admin_menu(): Admin_Menu {
+	public function get_admin_menu(): ?Admin_Menu {
 		return $this->admin_menu;
 	}
 
@@ -360,9 +366,9 @@ class WooCommerce_Priority_Processing {
 	 * Get orders instance
 	 *
 	 * @since 1.0.0
-	 * @return Core_Orders
+	 * @return Core_Orders|null
 	 */
-	public function get_orders(): Core_Orders {
+	public function get_orders(): ?Core_Orders {
 		return $this->core_orders;
 	}
 }
@@ -374,3 +380,7 @@ add_action(
 		WooCommerce_Priority_Processing::instance();
 	}
 );
+
+// Register activation and deactivation hooks.
+register_activation_hook( __FILE__, array( 'WooCommerce_Priority_Processing', 'on_activation' ) );
+register_deactivation_hook( __FILE__, array( 'WooCommerce_Priority_Processing', 'on_deactivation' ) );
