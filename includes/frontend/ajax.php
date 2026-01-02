@@ -128,21 +128,64 @@ class Frontend_AJAX {
 	/**
 	 * Get cart fragments for AJAX update
 	 *
+	 * Returns comprehensive fragments to update checkout without full refresh.
+	 * Includes order totals, shipping costs, and uses WooCommerce's filter
+	 * to allow other plugins to add their fragments.
+	 *
 	 * @since 1.4.2
 	 * @return array Cart fragments
 	 */
 	private function get_cart_fragments(): array {
-		$fragments = array(
-			'.order-total' => '<tr class="order-total"><th>' . esc_html__( 'Total', 'woocommerce' ) . '</th><td>' . WC()->cart->get_total() . '</td></tr>',
-		);
+		$fragments = array();
+
+		// Get order total fragment.
+		if ( function_exists( 'wc_cart_totals_order_total_html' ) ) {
+			ob_start();
+			wc_cart_totals_order_total_html();
+			$order_total = ob_get_clean();
+
+			$fragments['.order-total'] = '<tr class="order-total"><th>' . esc_html__( 'Total', 'woocommerce' ) . '</th><td>' . $order_total . '</td></tr>';
+		}
+
+		// Get full order review table fragment.
+		$order_review_table = $this->get_order_review_table();
+		if ( ! empty( $order_review_table ) ) {
+			$fragments['.woocommerce-checkout-review-order-table'] = $order_review_table;
+		}
 
 		/**
 		 * Filter cart fragments
+		 *
+		 * Allows other plugins/themes to add their own fragments.
+		 * This is the standard WooCommerce filter used during checkout updates.
 		 *
 		 * @since 1.4.2
 		 * @param array $fragments Cart fragments
 		 */
 		return apply_filters( 'woocommerce_update_order_review_fragments', $fragments );
+	}
+
+	/**
+	 * Get full order review table HTML
+	 *
+	 * @since 1.4.2
+	 * @return string Order review table HTML
+	 */
+	private function get_order_review_table(): string {
+		if ( ! function_exists( 'woocommerce_order_review' ) ) {
+			// Try alternative function.
+			if ( ! function_exists( 'wc_get_template' ) ) {
+				return '';
+			}
+
+			ob_start();
+			wc_get_template( 'checkout/review-order.php' );
+			return ob_get_clean();
+		}
+
+		ob_start();
+		woocommerce_order_review();
+		return ob_get_clean();
 	}
 
 	/**

@@ -49,7 +49,7 @@ class Frontend_Checkout
           <span class="wpp-label-content" style="flex: 1;">
             <strong style="color: #28a745; font-weight: 600; display: block; font-size: 14px;">
               <?php echo esc_html($checkbox_label); ?>
-              <span class="wpp-price" style="color: #dc3545; font-weight: 600; margin-left: 5px;">(+<?php echo wc_price($fee_amount); ?> added to shipping)</span>
+              <span class="wpp-price" style="color: #dc3545; font-weight: 600; margin-left: 5px;">(+ <?php echo wc_price($fee_amount); ?> )</span>
             </strong>
             <?php if (!empty($description)): ?>
               <small class="description" style="color: #6c757d; font-size: 13px; line-height: 1.4; display: block;"><?php echo esc_html($description); ?></small>

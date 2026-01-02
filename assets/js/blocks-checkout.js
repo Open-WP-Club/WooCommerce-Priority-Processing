@@ -181,7 +181,7 @@
       registerCheckoutBlock({
         metadata: {
           name: 'wpp-priority-processing',
-          parent: ['woocommerce/checkout-order-notes-block']
+          parent: ['woocommerce/checkout-fields-block']
         },
         component: PriorityProcessingBlock
       });

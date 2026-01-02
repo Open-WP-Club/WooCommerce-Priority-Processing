@@ -215,7 +215,7 @@ class WooCommerce_Priority_Processing {
 
 		// Initialize frontend components.
 		$this->frontend_checkout = new Frontend_Checkout();
-		$this->frontend_ajax     = new Frontend_Ajax();
+		$this->frontend_ajax     = new Frontend_AJAX();
 		$this->frontend_fees     = new Frontend_Fees();
 		$this->frontend_shipping = new Frontend_Shipping();
 		$this->frontend_blocks   = new Frontend_Blocks_Integration();

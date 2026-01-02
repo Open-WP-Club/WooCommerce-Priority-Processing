@@ -39,9 +39,6 @@
    * Handle priority processing change
    */
   function handlePriorityChange(isChecked) {
-    // Show loading indicator
-    showLoadingIndicator();
-
     // Send AJAX request
     $.ajax({
       url: wppData.ajax_url,
@@ -52,56 +49,42 @@
         priority_enabled: isChecked
       },
       success: function(response) {
+        console.log('AJAX Response:', response);
+
         if (response.success) {
-          // Update fragments if available (for classic checkout)
-          if (response.data.fragments) {
+          // Update fragments - this smoothly updates totals/shipping without page reload
+          if (response.data && response.data.fragments) {
+            console.log('Updating fragments:', response.data.fragments);
             $.each(response.data.fragments, function(key, value) {
-              $(key).replaceWith(value);
+              var $target = $(key);
+              if ($target.length) {
+                $target.replaceWith(value);
+                console.log('Updated fragment:', key);
+              } else {
+                console.warn('Fragment target not found:', key);
+              }
             });
           }
 
-          // Trigger checkout update AFTER a small delay to prevent race conditions
-          // This allows the session to be fully updated before shipping recalculates
-          setTimeout(function() {
-            $(document.body).trigger('update_checkout');
-          }, 100);
+          // Notify WooCommerce and other scripts that checkout was updated
+          // This is a notification event, NOT a trigger for full refresh
+          $(document.body).trigger('updated_checkout', [response.data]);
         } else {
-          console.error('Priority update failed:', response.data.message);
-          showErrorMessage(response.data.message);
+          var errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
+          console.error('Priority update failed:', errorMsg);
+          showErrorMessage(errorMsg);
         }
       },
-      error: function(xhr, status, error) {
-        console.error('AJAX error:', error);
-        showErrorMessage('An error occurred. Please try again.');
-      },
-      complete: function() {
-        // Hide loading indicator after a brief delay to ensure update completes
-        setTimeout(function() {
-          hideLoadingIndicator();
-        }, 150);
+      error: function(jqXHR, textStatus, errorThrown) {
+        console.error('AJAX error details:', {
+          status: jqXHR.status,
+          statusText: textStatus,
+          error: errorThrown,
+          response: jqXHR.responseText
+        });
+        showErrorMessage('An error occurred. Please check the console for details.');
       }
     });
-  }
-
-  /**
-   * Show loading indicator
-   */
-  function showLoadingIndicator() {
-    // Block the checkout form
-    $('.woocommerce-checkout').block({
-      message: null,
-      overlayCSS: {
-        background: '#fff',
-        opacity: 0.6
-      }
-    });
-  }
-
-  /**
-   * Hide loading indicator
-   */
-  function hideLoadingIndicator() {
-    $('.woocommerce-checkout').unblock();
   }
 
   /**
