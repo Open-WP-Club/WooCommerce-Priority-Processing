@@ -88,7 +88,7 @@ class Frontend_Shipping {
 	 */
 	public function add_priority_metadata_to_rates( array $rates, array $package ): array {
 		// Only add metadata if priority processing is active.
-		if ( ! $this->is_priority_processing_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return $rates;
 		}
 
@@ -153,7 +153,7 @@ class Frontend_Shipping {
 	 * @return array<string, mixed> Modified request data
 	 */
 	public function modify_fedex_api_request( array $request_data, ?array $package_data = null ): array {
-		if ( ! $this->is_priority_processing_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return $request_data;
 		}
 
@@ -202,7 +202,7 @@ class Frontend_Shipping {
 	 * @return array<string, mixed> Modified request data
 	 */
 	public function modify_ups_api_request( array $request_data, ?array $package_data = null ): array {
-		if ( ! $this->is_priority_processing_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return $request_data;
 		}
 
@@ -239,7 +239,7 @@ class Frontend_Shipping {
 	 * @return array<string, mixed> Modified request data
 	 */
 	public function modify_usps_api_request( array $request_data, ?array $package_data = null ): array {
-		if ( ! $this->is_priority_processing_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return $request_data;
 		}
 
@@ -276,7 +276,7 @@ class Frontend_Shipping {
 	 * @return array<string, mixed> Modified request data
 	 */
 	public function modify_dhl_api_request( array $request_data, ?array $package_data = null ): array {
-		if ( ! $this->is_priority_processing_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return $request_data;
 		}
 
@@ -313,7 +313,7 @@ class Frontend_Shipping {
 	 * @return array<string, mixed> Modified request data
 	 */
 	public function modify_generic_shipping_request( array $request_data, ?array $package = null ): array {
-		if ( ! $this->is_priority_processing_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return $request_data;
 		}
 
@@ -351,7 +351,7 @@ class Frontend_Shipping {
 	 * @return array<string, \WC_Shipping_Rate> Modified shipping rates
 	 */
 	public function check_priority_for_rates( array $rates, array $package ): array {
-		if ( ! $this->is_priority_processing_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return $rates;
 		}
 
@@ -379,21 +379,6 @@ class Frontend_Shipping {
 	}
 
 	/**
-	 * Check if priority processing is currently active
-	 *
-	 * @since 1.0.0
-	 * @return bool True if priority processing is active
-	 */
-	private function is_priority_processing_active(): bool {
-		if ( ! WC()->session ) {
-			return false;
-		}
-
-		$priority = WC()->session->get( 'priority_processing', false );
-		return ( $priority === true || $priority === '1' || $priority === 1 );
-	}
-
-	/**
 	 * Get shipping integration status
 	 *
 	 * @since 1.0.0
@@ -413,7 +398,7 @@ class Frontend_Shipping {
 			$active_integrations[ $key ] = array(
 				'name'             => $name,
 				'active'           => $this->is_integration_active( $key ),
-				'priority_enabled' => $this->is_priority_processing_active(),
+				'priority_enabled' => Core_Permissions::is_priority_active(),
 			);
 		}
 

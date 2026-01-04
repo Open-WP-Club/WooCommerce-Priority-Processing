@@ -14,15 +14,13 @@ declare(strict_types=1);
  *
  * @since 1.0.0
  */
-class Core_Permissions
-{
+class Core_Permissions {
   /**
    * Check if current user can access priority processing
    * 
    * @return bool
    */
-  public static function can_access_priority_processing()
-  {
+  public static function can_access_priority_processing() {
     // Shop managers and administrators always have access
     if (current_user_can('manage_woocommerce') || current_user_can('administrator')) {
       return true;
@@ -66,7 +64,6 @@ class Core_Permissions
    * @return bool
    */
   public static function user_can_access($user_id)
-  {
     if (empty($user_id)) {
       return self::can_access_priority_processing();
     }
@@ -105,8 +102,7 @@ class Core_Permissions
    * 
    * @return array
    */
-  public static function get_available_roles()
-  {
+  public static function get_available_roles() {
     global $wp_roles;
 
     if (!isset($wp_roles)) {
@@ -127,8 +123,7 @@ class Core_Permissions
    * 
    * @return array
    */
-  public static function get_allowed_user_roles()
-  {
+  public static function get_allowed_user_roles() {
     $allowed_roles = get_option('wpp_allowed_user_roles', ['customer']);
 
     // Ensure it's always an array
@@ -146,8 +141,7 @@ class Core_Permissions
    * 
    * @return array
    */
-  public static function get_available_user_roles()
-  {
+  public static function get_available_user_roles() {
     global $wp_roles;
 
     if (!isset($wp_roles)) {
@@ -167,11 +161,10 @@ class Core_Permissions
 
   /**
    * Get current permission summary for admin display
-   * 
+   *
    * @return array
    */
-  public static function get_permission_summary()
-  {
+  public static function get_permission_summary() {
     $allowed_roles = self::get_allowed_user_roles();
     $allow_guests = get_option('wpp_allow_guests', '1');
 
@@ -194,5 +187,21 @@ class Core_Permissions
     }
 
     return $summary;
+  }
+
+  /**
+   * Check if priority processing is active in current session
+   * Shared utility method used across multiple classes
+   *
+   * @since 1.4.2
+   * @return bool True if priority processing is active
+   */
+  public static function is_priority_active(): bool {
+    if (!WC()->session) {
+      return false;
+    }
+
+    $priority = WC()->session->get('priority_processing', false);
+    return ($priority === true || $priority === '1' || $priority === 1);
   }
 }

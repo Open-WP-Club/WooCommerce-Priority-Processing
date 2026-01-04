@@ -118,7 +118,7 @@ class Frontend_Blocks_Integration {
 	private function get_priority_data(): array {
 		$is_enabled = get_option( 'wpp_enabled' ) === 'yes' || get_option( 'wpp_enabled' ) === '1';
 		$can_access = Core_Permissions::can_access_priority_processing();
-		$is_active  = $this->is_priority_active();
+		$is_active  = Core_Permissions::is_priority_active();
 
 		return array(
 			'enabled'        => $is_enabled && $can_access,
@@ -211,21 +211,6 @@ class Frontend_Blocks_Integration {
 
 			$this->log_debug( 'WPP Blocks: Priority processing ' . ( $priority_enabled ? 'enabled' : 'disabled' ) );
 		}
-	}
-
-	/**
-	 * Check if priority processing is active
-	 *
-	 * @since 1.4.0
-	 * @return bool True if priority processing is active
-	 */
-	private function is_priority_active(): bool {
-		if ( ! WC()->session ) {
-			return false;
-		}
-
-		$priority = WC()->session->get( 'priority_processing', false );
-		return ( $priority === true || $priority === '1' || $priority === 1 );
 	}
 
 	/**

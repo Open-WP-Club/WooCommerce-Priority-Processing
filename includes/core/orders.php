@@ -16,7 +16,6 @@ declare(strict_types=1);
  */
 class Core_Orders {
   public function __construct() {
-  {
     // Order list display functionality
     add_action('woocommerce_admin_order_data_after_billing_address', [$this, 'display_priority_in_admin']);
     add_action('admin_head', [$this, 'orders_list_styles']);
@@ -39,7 +38,6 @@ class Core_Orders {
    * Display priority processing info in individual order admin
    */
   public function display_priority_in_admin($order)
-  {
     if ($order->get_meta('_priority_processing') === 'yes') {
 ?>
       <p style="margin-top: 10px;">
@@ -54,7 +52,6 @@ class Core_Orders {
    * Add styles and scripts for orders list page
    */
   public function orders_list_styles() {
-  {
     if (!$this->is_orders_page()) {
       return;
     }
@@ -111,7 +108,6 @@ class Core_Orders {
    * Modify order number display for traditional post-based orders
    */
   public function modify_order_number_display($column, $post_id)
-  {
     if ($column === 'order_number') {
       $order = wc_get_order($post_id);
       if ($order && $order->get_meta('_priority_processing') === 'yes') {
@@ -125,7 +121,6 @@ class Core_Orders {
    * Modify order number display for HPOS orders
    */
   public function modify_order_number_display_hpos($column, $order)
-  {
     if ($column === 'order_number') {
       if ($order && $order->get_meta('_priority_processing') === 'yes') {
         // Add hidden marker that will be processed by JavaScript
@@ -138,7 +133,6 @@ class Core_Orders {
    * Check if we're on an orders page
    */
   private function is_orders_page() {
-  {
     global $pagenow, $typenow;
 
     // Traditional orders page
@@ -158,7 +152,6 @@ class Core_Orders {
    * Add priority processing meta box to order edit page
    */
   public function add_order_meta_box() {
-  {
     // Traditional post-based orders
     add_meta_box(
       'wpp_order_priority',
@@ -186,7 +179,6 @@ class Core_Orders {
    * Display the priority processing meta box
    */
   public function order_priority_meta_box($post_or_order)
-  {
     // Get order object
     $order = ($post_or_order instanceof WP_Post) ? wc_get_order($post_or_order->ID) : $post_or_order;
 
@@ -262,7 +254,6 @@ class Core_Orders {
    * AJAX handler for toggling order priority
    */
   public function ajax_toggle_order_priority() {
-  {
     // Security checks
     if (!current_user_can('manage_woocommerce')) {
       wp_send_json_error(__('Permission denied', 'woo-priority'));
@@ -416,7 +407,6 @@ class Core_Orders {
    * Enqueue scripts and styles for order admin pages
    */
   public function order_admin_scripts($hook)
-  {
     global $post_type;
     $screen = get_current_screen();
 
@@ -444,7 +434,6 @@ class Core_Orders {
    * Shows a highlighted notice at the top
    */
   public function display_priority_on_thank_you($order_id)
-  {
     if (!$order_id) {
       return;
     }
@@ -474,7 +463,6 @@ class Core_Orders {
    * Shows priority info right after shipping address in admin
    */
   public function display_priority_in_shipping_section($order)
-  {
     if ($order->get_meta('_priority_processing') !== 'yes') {
       return;
     }

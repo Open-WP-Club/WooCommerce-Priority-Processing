@@ -39,7 +39,7 @@ class Frontend_Fees {
 	 * @return void
 	 */
 	public function add_priority_fee_to_cart(): void {
-		if ( ! $this->is_priority_active() ) {
+		if ( ! Core_Permissions::is_priority_active() ) {
 			return;
 		}
 
@@ -96,20 +96,5 @@ class Frontend_Fees {
 		$order->save();
 	}
 
-
-	/**
-	 * Check if priority processing is active in current session
-	 *
-	 * @since 1.0.0
-	 * @return bool True if priority processing is active
-	 */
-	private function is_priority_active(): bool {
-		if ( ! WC()->session ) {
-			return false;
-		}
-
-		$priority = WC()->session->get( 'priority_processing', false );
-		return ( $priority === true || $priority === '1' || $priority === 1 );
-	}
 
 }
