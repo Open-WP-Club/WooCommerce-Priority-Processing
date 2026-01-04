@@ -1,13 +1,22 @@
 <?php
-
 /**
  * Frontend Checkout Handler
  * Handles priority processing checkbox display and integration
+ *
+ * @package WooCommerce_Priority_Processing
+ * @since 1.0.0
  */
-class Frontend_Checkout
-{
-  public function __construct()
-  {
+
+declare(strict_types=1);
+
+/**
+ * Frontend Checkout Class
+ *
+ * @since 1.0.0
+ */
+class Frontend_Checkout {
+
+  public function __construct() {
     // Enqueue scripts and styles
     add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
 
@@ -21,8 +30,7 @@ class Frontend_Checkout
   /**
    * Display priority section with custom styling
    */
-  public function display_priority_section($checkout)
-  {
+  public function display_priority_section($checkout) {
     if (!$this->should_display_field()) {
       return;
     }
@@ -64,9 +72,14 @@ class Frontend_Checkout
   /**
    * Save priority field value to order meta
    */
-  public function save_priority_field($order_id)
-  {
-    if (isset($_POST['priority_processing']) && $_POST['priority_processing'] === '1') {
+  public function save_priority_field($order_id) {
+    // Verify nonce for security
+    if (!isset($_POST['woocommerce-process-checkout-nonce']) ||
+        !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['woocommerce-process-checkout-nonce'])), 'woocommerce-process_checkout')) {
+      return;
+    }
+
+    if (isset($_POST['priority_processing']) && sanitize_text_field(wp_unslash($_POST['priority_processing'])) === '1') {
       // Update session
       if (WC()->session) {
         WC()->session->set('priority_processing', true);
@@ -82,8 +95,7 @@ class Frontend_Checkout
   /**
    * Check if priority field should be displayed
    */
-  private function should_display_field()
-  {
+  private function should_display_field() {
     // Check if feature is enabled
     if (get_option('wpp_enabled') !== 'yes' && get_option('wpp_enabled') !== '1') {
       return false;
@@ -100,8 +112,7 @@ class Frontend_Checkout
   /**
    * Get current checkbox state from session
    */
-  private function get_checkbox_state()
-  {
+  private function get_checkbox_state() {
     if (!WC()->session) {
       return false;
     }
@@ -113,8 +124,7 @@ class Frontend_Checkout
   /**
    * Enqueue frontend scripts and styles
    */
-  public function frontend_scripts()
-  {
+  public function frontend_scripts() {
     if (!is_checkout()) {
       return;
     }

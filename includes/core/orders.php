@@ -1,12 +1,21 @@
 <?php
-
 /**
  * Core Orders Handler
  * Manages order display, admin functionality, and priority order handling
+ *
+ * @package WooCommerce_Priority_Processing
+ * @since 1.0.0
  */
-class Core_Orders
-{
-  public function __construct()
+
+declare(strict_types=1);
+
+/**
+ * Core Orders Class
+ *
+ * @since 1.0.0
+ */
+class Core_Orders {
+  public function __construct() {
   {
     // Order list display functionality
     add_action('woocommerce_admin_order_data_after_billing_address', [$this, 'display_priority_in_admin']);
@@ -44,7 +53,7 @@ class Core_Orders
   /**
    * Add styles and scripts for orders list page
    */
-  public function orders_list_styles()
+  public function orders_list_styles() {
   {
     if (!$this->is_orders_page()) {
       return;
@@ -128,7 +137,7 @@ class Core_Orders
   /**
    * Check if we're on an orders page
    */
-  private function is_orders_page()
+  private function is_orders_page() {
   {
     global $pagenow, $typenow;
 
@@ -148,7 +157,7 @@ class Core_Orders
   /**
    * Add priority processing meta box to order edit page
    */
-  public function add_order_meta_box()
+  public function add_order_meta_box() {
   {
     // Traditional post-based orders
     add_meta_box(
@@ -252,7 +261,7 @@ class Core_Orders
   /**
    * AJAX handler for toggling order priority
    */
-  public function ajax_toggle_order_priority()
+  public function ajax_toggle_order_priority() {
   {
     // Security checks
     if (!current_user_can('manage_woocommerce')) {

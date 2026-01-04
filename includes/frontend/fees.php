@@ -96,59 +96,6 @@ class Frontend_Fees {
 		$order->save();
 	}
 
-	/**
-	 * Calculate fee amount based on cart contents (if needed for complex logic)
-	 *
-	 * @since 1.0.0
-	 * @return float Calculated fee amount
-	 */
-	public function calculate_dynamic_fee(): float {
-		$base_fee   = floatval( get_option( 'wpp_fee_amount', '5.00' ) );
-		$cart_total = WC()->cart ? WC()->cart->get_subtotal() : 0;
-
-		// Example: could implement percentage-based fees or tiered pricing.
-		// For now, just return the base fee.
-		return $base_fee;
-	}
-
-	/**
-	 * Get fee display information
-	 *
-	 * @since 1.0.0
-	 * @return array<string, mixed> Fee information
-	 */
-	public function get_fee_info(): array {
-		return array(
-			'amount'           => floatval( get_option( 'wpp_fee_amount', '5.00' ) ),
-			'label'            => get_option( 'wpp_fee_label', 'Priority Processing & Express Shipping' ),
-			'formatted_amount' => wc_price( get_option( 'wpp_fee_amount', '5.00' ) ),
-			'is_enabled'       => ( get_option( 'wpp_enabled' ) === '1' || get_option( 'wpp_enabled' ) === 'yes' ),
-		);
-	}
-
-	/**
-	 * Remove priority processing fee (if needed)
-	 *
-	 * @since 1.0.0
-	 * @return bool True if fee was removed, false otherwise
-	 */
-	public function remove_priority_fee(): bool {
-		if ( ! WC()->cart ) {
-			return false;
-		}
-
-		$fee_label = get_option( 'wpp_fee_label', 'Priority Processing & Express Shipping' );
-		$fees      = WC()->cart->get_fees();
-
-		foreach ( $fees as $fee_key => $fee ) {
-			if ( $fee->name === $fee_label ) {
-				unset( $fees[ $fee_key ] );
-				return true;
-			}
-		}
-
-		return false;
-	}
 
 	/**
 	 * Check if priority processing is active in current session
@@ -165,36 +112,4 @@ class Frontend_Fees {
 		return ( $priority === true || $priority === '1' || $priority === 1 );
 	}
 
-	/**
-	 * Get current cart total including priority fee
-	 *
-	 * @since 1.0.0
-	 * @return float Cart total with priority fee
-	 */
-	public function get_total_with_priority(): float {
-		if ( ! WC()->cart ) {
-			return 0;
-		}
-
-		$cart_total   = WC()->cart->get_total( '' );
-		$priority_fee = $this->is_priority_active() ? floatval( get_option( 'wpp_fee_amount', '5.00' ) ) : 0;
-
-		return $cart_total + $priority_fee;
-	}
-
-	/**
-	 * Format fee for display
-	 *
-	 * @since 1.0.0
-	 * @param float $amount         Fee amount to format.
-	 * @param bool  $include_symbol Whether to include currency symbol.
-	 * @return string Formatted fee amount
-	 */
-	public function format_fee_display( float $amount, bool $include_symbol = true ): string {
-		if ( $include_symbol ) {
-			return wc_price( $amount );
-		}
-
-		return number_format( $amount, 2 );
-	}
 }

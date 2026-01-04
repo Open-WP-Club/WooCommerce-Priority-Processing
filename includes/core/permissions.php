@@ -1,8 +1,18 @@
 <?php
-
 /**
  * Core Permissions Handler
  * Manages access control for priority processing feature
+ *
+ * @package WooCommerce_Priority_Processing
+ * @since 1.0.0
+ */
+
+declare(strict_types=1);
+
+/**
+ * Core Permissions Class
+ *
+ * @since 1.0.0
  */
 class Core_Permissions
 {

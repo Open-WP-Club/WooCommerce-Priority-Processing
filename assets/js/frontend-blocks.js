@@ -49,19 +49,13 @@
         priority_enabled: isChecked
       },
       success: function(response) {
-        console.log('AJAX Response:', response);
-
         if (response.success) {
           // Update fragments - this smoothly updates totals/shipping without page reload
           if (response.data && response.data.fragments) {
-            console.log('Updating fragments:', response.data.fragments);
             $.each(response.data.fragments, function(key, value) {
               var $target = $(key);
               if ($target.length) {
                 $target.replaceWith(value);
-                console.log('Updated fragment:', key);
-              } else {
-                console.warn('Fragment target not found:', key);
               }
             });
           }
@@ -71,18 +65,11 @@
           $(document.body).trigger('updated_checkout', [response.data]);
         } else {
           var errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
-          console.error('Priority update failed:', errorMsg);
           showErrorMessage(errorMsg);
         }
       },
       error: function(jqXHR, textStatus, errorThrown) {
-        console.error('AJAX error details:', {
-          status: jqXHR.status,
-          statusText: textStatus,
-          error: errorThrown,
-          response: jqXHR.responseText
-        });
-        showErrorMessage('An error occurred. Please check the console for details.');
+        showErrorMessage('An error occurred. Please try again.');
       }
     });
   }

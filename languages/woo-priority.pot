@@ -120,3 +120,11 @@ msgstr ""
 #: includes/core/orders.php:458
 msgid "Your order includes %s. We'll process and ship your order as quickly as possible!"
 msgstr ""
+
+#: includes/core/permissions.php:171
+msgid "Shop Managers & Administrators"
+msgstr ""
+
+#: includes/core/permissions.php:183
+msgid "Guest Users"
+msgstr ""

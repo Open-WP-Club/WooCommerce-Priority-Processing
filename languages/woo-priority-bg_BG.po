@@ -122,3 +122,11 @@ msgstr "Priority Processing е активиран!"
 #: includes/core/orders.php:458
 msgid "Your order includes %s. We'll process and ship your order as quickly as possible!"
 msgstr "Вашата поръчка включва %s. Ще обработим и изпратим поръчката ви възможно най-бързо!"
+
+#: includes/core/permissions.php:171
+msgid "Shop Managers & Administrators"
+msgstr "Мениджъри на магазина и администратори"
+
+#: includes/core/permissions.php:183
+msgid "Guest Users"
+msgstr "Гост потребители"
