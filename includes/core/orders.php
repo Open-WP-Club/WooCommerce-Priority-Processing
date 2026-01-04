@@ -20,7 +20,6 @@ class Core_Orders
     add_action('admin_enqueue_scripts', [$this, 'order_admin_scripts']);
 
     // Frontend order display
-    add_action('woocommerce_order_details_after_order_table', [$this, 'display_priority_on_order_view'], 10, 1);
     add_action('woocommerce_thankyou', [$this, 'display_priority_on_thank_you'], 10, 1);
 
     // Backend shipping section display
@@ -211,7 +210,7 @@ class Core_Orders
         <div class="wpp-priority-active">
           <p><strong style="color: #0f5132;">✅ <?php _e('Priority Processing Active', 'woo-priority'); ?></strong></p>
           <?php if ($existing_fee): ?>
-            <p><?php printf(__('Fee: %s'), wc_price($existing_fee->get_total())); ?></p>
+            <p><?php printf(__('Fee: %s', 'woo-priority'), wc_price($existing_fee->get_total())); ?></p>
           <?php endif; ?>
 
           <?php if ($can_modify): ?>
@@ -232,7 +231,7 @@ class Core_Orders
             </button>
 
             <p style="font-size: 12px; color: #666; margin-top: 8px;">
-              <?php printf(__('New total: %s'), wc_price($order->get_total() + floatval($fee_amount))); ?>
+              <?php printf(__('New total: %s', 'woo-priority'), wc_price($order->get_total() + floatval($fee_amount))); ?>
             </p>
           <?php else: ?>
             <p style="font-size: 12px; color: #666;">
@@ -432,43 +431,6 @@ class Core_Orders
   }
 
   /**
-   * Display priority processing on frontend order view page
-   * Shows after the order table on customer's order view
-   */
-  public function display_priority_on_order_view($order)
-  {
-    // Get order object if it's an ID
-    if (!is_object($order)) {
-      $order = wc_get_order($order);
-    }
-
-    if (!$order || $order->get_meta('_priority_processing') !== 'yes') {
-      return;
-    }
-
-    $fee_amount = $order->get_meta('_priority_fee_amount');
-    if (!$fee_amount) {
-      $fee_amount = get_option('wpp_fee_amount', '5.00');
-    }
-
-    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
-
-    ?>
-    <section class="wpp-priority-order-notice" style="margin: 20px 0; padding: 15px; background: #f0f9ff; border-left: 4px solid #0ea5e9; border-radius: 4px;">
-      <h3 style="margin: 0 0 10px 0; color: #0369a1; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 20px;">⚡</span>
-        <?php _e('Priority Processing', 'woo-priority'); ?>
-      </h3>
-      <p style="margin: 0; color: #164e63; line-height: 1.6;">
-        <strong><?php echo esc_html($fee_label); ?></strong><br>
-        <?php printf(__('Priority Fee: %s', 'woo-priority'), '<strong>' . wc_price($fee_amount) . '</strong>'); ?><br>
-        <small style="color: #0e7490;"><?php _e('Your order is being processed with priority and will ship via express delivery.', 'woo-priority'); ?></small>
-      </p>
-    </section>
-    <?php
-  }
-
-  /**
    * Display priority processing on order confirmation (thank you) page
    * Shows a highlighted notice at the top
    */
@@ -507,24 +469,10 @@ class Core_Orders
     if ($order->get_meta('_priority_processing') !== 'yes') {
       return;
     }
-
-    $fee_amount = $order->get_meta('_priority_fee_amount');
-    if (!$fee_amount) {
-      $fee_amount = get_option('wpp_fee_amount', '5.00');
-    }
-
-    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
-    $service_level = $order->get_meta('_priority_service_level');
-    if (!$service_level) {
-      $service_level = 'express';
-    }
-
     ?>
-    <div class="wpp-shipping-priority-info" style="margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 4px solid #ff6b35; border-radius: 4px;">
-      <h4 style="margin: 0 0 8px 0; color: #d63638; font-size: 14px; font-weight: 600;">
-        ⚡ <?php _e('Priority Processing Active', 'woo-priority'); ?>
-      </h4>
-    </div>
+    <p style="margin-top: 10px;">
+      ⚡ <strong><?php _e('Priority Processing Active', 'woo-priority'); ?></strong>
+    </p>
     <?php
   }
 }
