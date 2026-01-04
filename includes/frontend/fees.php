@@ -25,8 +25,31 @@ class Frontend_Fees {
 	 * @since 1.0.0
 	 */
 	public function __construct() {
+		// Add priority fee to cart as a separate line item.
+		add_action( 'woocommerce_cart_calculate_fees', array( $this, 'add_priority_fee_to_cart' ), 10 );
+
 		// Save priority processing status to orders during checkout.
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'save_priority_to_order' ), 10, 2 );
+	}
+
+	/**
+	 * Add priority processing fee to cart as a separate line item
+	 *
+	 * @since 1.4.2
+	 * @return void
+	 */
+	public function add_priority_fee_to_cart(): void {
+		if ( ! $this->is_priority_active() ) {
+			return;
+		}
+
+		$fee_amount = floatval( get_option( 'wpp_fee_amount', '5.00' ) );
+		$fee_label  = get_option( 'wpp_fee_label', 'Priority Processing & Express Shipping' );
+
+		if ( $fee_amount > 0 && WC()->cart ) {
+			// Add fee as a separate line item in cart.
+			WC()->cart->add_fee( $fee_label, $fee_amount, true );
+		}
 	}
 
 	/**

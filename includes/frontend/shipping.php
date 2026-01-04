@@ -28,8 +28,10 @@ class Frontend_Shipping {
 		// Add early hook to ensure session is set before packages are built.
 		add_action( 'woocommerce_checkout_update_order_review', array( $this, 'ensure_priority_session_before_shipping' ), 5 );
 
-		// MAIN APPROACH: Add priority fee directly to shipping rates.
-		add_filter( 'woocommerce_package_rates', array( $this, 'add_priority_to_shipping_rates' ), 100, 2 );
+		// NOTE: Priority fee is now added as a separate line item via Frontend_Fees class.
+		// We no longer add it to shipping rates to keep it visible and separate.
+		// Hook kept for potential future use or metadata tracking.
+		add_filter( 'woocommerce_package_rates', array( $this, 'add_priority_metadata_to_rates' ), 100, 2 );
 	}
 
 	/**
@@ -75,16 +77,17 @@ class Frontend_Shipping {
 	}
 
 	/**
-	 * Add priority fee directly to shipping rates
-	 * This is the main method - fee is included in shipping cost, not as separate line item
+	 * Add priority metadata to shipping rates (no longer modifies cost)
+	 * Fee is now added as a separate cart line item in Frontend_Fees class
 	 *
 	 * @since 1.0.0
+	 * @since 1.4.2 Changed to only add metadata, not modify shipping cost
 	 * @param array<string, \WC_Shipping_Rate> $rates   Shipping rates.
 	 * @param array<string, mixed>             $package Package data.
-	 * @return array<string, \WC_Shipping_Rate> Modified shipping rates
+	 * @return array<string, \WC_Shipping_Rate> Rates with priority metadata
 	 */
-	public function add_priority_to_shipping_rates( array $rates, array $package ): array {
-		// Only modify rates if priority processing is active.
+	public function add_priority_metadata_to_rates( array $rates, array $package ): array {
+		// Only add metadata if priority processing is active.
 		if ( ! $this->is_priority_processing_active() ) {
 			return $rates;
 		}
@@ -95,26 +98,16 @@ class Frontend_Shipping {
 			return $rates;
 		}
 
-		$this->log_debug( 'WPP: Adding ' . $priority_fee . ' to ' . count( $rates ) . ' shipping rates' );
+		$this->log_debug( 'WPP: Adding priority metadata to ' . count( $rates ) . ' shipping rates' );
 
-		// Modify each shipping rate to include the priority fee.
+		// Add metadata to shipping rates for tracking (don't modify cost).
 		foreach ( $rates as $rate_key => $rate ) {
-			// Add the priority fee to the shipping cost.
-			$original_cost           = $rate->cost;
-			$rates[ $rate_key ]->cost = $original_cost + $priority_fee;
-
-			// Optional: Update the label to indicate priority is included.
-			$show_priority_in_label = apply_filters( 'wpp_show_priority_in_shipping_label', false );
-			if ( $show_priority_in_label ) {
-				$rates[ $rate_key ]->label = $rate->label . ' ' . __( '(Priority)', 'woo-priority' );
-			}
-
-			// Add metadata for tracking.
+			// Add metadata for tracking (cost is NOT modified).
 			$rates[ $rate_key ]->add_meta_data( 'wpp_priority_processing', 'yes', true );
-			$rates[ $rate_key ]->add_meta_data( 'wpp_priority_fee_added', $priority_fee, true );
-			$rates[ $rate_key ]->add_meta_data( 'wpp_original_cost', $original_cost, true );
+			$rates[ $rate_key ]->add_meta_data( 'wpp_priority_fee_amount', $priority_fee, true );
+			$rates[ $rate_key ]->add_meta_data( 'wpp_requires_express', 'yes', true );
 
-			$this->log_debug( "WPP: Modified rate '{$rate->label}': {$original_cost} -> " . $rates[ $rate_key ]->cost );
+			$this->log_debug( "WPP: Added priority metadata to rate '{$rate->label}'" );
 		}
 
 		return $rates;
