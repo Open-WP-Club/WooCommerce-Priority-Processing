@@ -39,9 +39,6 @@
    * Handle priority processing change
    */
   function handlePriorityChange(isChecked) {
-    // Show loading indicator
-    showLoadingIndicator();
-
     // Send AJAX request
     $.ajax({
       url: wppData.ajax_url,
@@ -53,42 +50,28 @@
       },
       success: function(response) {
         if (response.success) {
-          // Trigger checkout update to refresh totals
-          $(document.body).trigger('update_checkout');
+          // Update fragments - this smoothly updates totals/shipping without page reload
+          if (response.data && response.data.fragments) {
+            $.each(response.data.fragments, function(key, value) {
+              var $target = $(key);
+              if ($target.length) {
+                $target.replaceWith(value);
+              }
+            });
+          }
+
+          // Notify WooCommerce and other scripts that checkout was updated
+          // This is a notification event, NOT a trigger for full refresh
+          $(document.body).trigger('updated_checkout', [response.data]);
         } else {
-          console.error('Priority update failed:', response.data.message);
-          showErrorMessage(response.data.message);
+          var errorMsg = response.data && response.data.message ? response.data.message : 'Unknown error';
+          showErrorMessage(errorMsg);
         }
       },
-      error: function(xhr, status, error) {
-        console.error('AJAX error:', error);
+      error: function(jqXHR, textStatus, errorThrown) {
         showErrorMessage('An error occurred. Please try again.');
-      },
-      complete: function() {
-        hideLoadingIndicator();
       }
     });
-  }
-
-  /**
-   * Show loading indicator
-   */
-  function showLoadingIndicator() {
-    // Block the checkout form
-    $('.woocommerce-checkout').block({
-      message: null,
-      overlayCSS: {
-        background: '#fff',
-        opacity: 0.6
-      }
-    });
-  }
-
-  /**
-   * Hide loading indicator
-   */
-  function hideLoadingIndicator() {
-    $('.woocommerce-checkout').unblock();
   }
 
   /**

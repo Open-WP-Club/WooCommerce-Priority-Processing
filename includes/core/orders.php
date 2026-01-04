@@ -1,13 +1,21 @@
 <?php
-
 /**
  * Core Orders Handler
  * Manages order display, admin functionality, and priority order handling
+ *
+ * @package WooCommerce_Priority_Processing
+ * @since 1.0.0
  */
-class Core_Orders
-{
-  public function __construct()
-  {
+
+declare(strict_types=1);
+
+/**
+ * Core Orders Class
+ *
+ * @since 1.0.0
+ */
+class Core_Orders {
+  public function __construct() {
     // Order list display functionality
     add_action('woocommerce_admin_order_data_after_billing_address', [$this, 'display_priority_in_admin']);
     add_action('admin_head', [$this, 'orders_list_styles']);
@@ -18,13 +26,18 @@ class Core_Orders
     add_action('add_meta_boxes', [$this, 'add_order_meta_box']);
     add_action('wp_ajax_wpp_toggle_order_priority', [$this, 'ajax_toggle_order_priority']);
     add_action('admin_enqueue_scripts', [$this, 'order_admin_scripts']);
+
+    // Frontend order display
+    add_action('woocommerce_thankyou', [$this, 'display_priority_on_thank_you'], 10, 1);
+
+    // Backend shipping section display
+    add_action('woocommerce_admin_order_data_after_shipping_address', [$this, 'display_priority_in_shipping_section'], 10, 1);
   }
 
   /**
    * Display priority processing info in individual order admin
    */
   public function display_priority_in_admin($order)
-  {
     if ($order->get_meta('_priority_processing') === 'yes') {
 ?>
       <p style="margin-top: 10px;">
@@ -38,8 +51,7 @@ class Core_Orders
   /**
    * Add styles and scripts for orders list page
    */
-  public function orders_list_styles()
-  {
+  public function orders_list_styles() {
     if (!$this->is_orders_page()) {
       return;
     }
@@ -96,7 +108,6 @@ class Core_Orders
    * Modify order number display for traditional post-based orders
    */
   public function modify_order_number_display($column, $post_id)
-  {
     if ($column === 'order_number') {
       $order = wc_get_order($post_id);
       if ($order && $order->get_meta('_priority_processing') === 'yes') {
@@ -110,7 +121,6 @@ class Core_Orders
    * Modify order number display for HPOS orders
    */
   public function modify_order_number_display_hpos($column, $order)
-  {
     if ($column === 'order_number') {
       if ($order && $order->get_meta('_priority_processing') === 'yes') {
         // Add hidden marker that will be processed by JavaScript
@@ -122,8 +132,7 @@ class Core_Orders
   /**
    * Check if we're on an orders page
    */
-  private function is_orders_page()
-  {
+  private function is_orders_page() {
     global $pagenow, $typenow;
 
     // Traditional orders page
@@ -142,8 +151,7 @@ class Core_Orders
   /**
    * Add priority processing meta box to order edit page
    */
-  public function add_order_meta_box()
-  {
+  public function add_order_meta_box() {
     // Traditional post-based orders
     add_meta_box(
       'wpp_order_priority',
@@ -171,7 +179,6 @@ class Core_Orders
    * Display the priority processing meta box
    */
   public function order_priority_meta_box($post_or_order)
-  {
     // Get order object
     $order = ($post_or_order instanceof WP_Post) ? wc_get_order($post_or_order->ID) : $post_or_order;
 
@@ -204,7 +211,7 @@ class Core_Orders
         <div class="wpp-priority-active">
           <p><strong style="color: #0f5132;">✅ <?php _e('Priority Processing Active', 'woo-priority'); ?></strong></p>
           <?php if ($existing_fee): ?>
-            <p><?php printf(__('Fee: %s'), wc_price($existing_fee->get_total())); ?></p>
+            <p><?php printf(__('Fee: %s', 'woo-priority'), wc_price($existing_fee->get_total())); ?></p>
           <?php endif; ?>
 
           <?php if ($can_modify): ?>
@@ -225,7 +232,7 @@ class Core_Orders
             </button>
 
             <p style="font-size: 12px; color: #666; margin-top: 8px;">
-              <?php printf(__('New total: %s'), wc_price($order->get_total() + floatval($fee_amount))); ?>
+              <?php printf(__('New total: %s', 'woo-priority'), wc_price($order->get_total() + floatval($fee_amount))); ?>
             </p>
           <?php else: ?>
             <p style="font-size: 12px; color: #666;">
@@ -246,8 +253,7 @@ class Core_Orders
   /**
    * AJAX handler for toggling order priority
    */
-  public function ajax_toggle_order_priority()
-  {
+  public function ajax_toggle_order_priority() {
     // Security checks
     if (!current_user_can('manage_woocommerce')) {
       wp_send_json_error(__('Permission denied', 'woo-priority'));
@@ -401,7 +407,6 @@ class Core_Orders
    * Enqueue scripts and styles for order admin pages
    */
   public function order_admin_scripts($hook)
-  {
     global $post_type;
     $screen = get_current_screen();
 
@@ -422,5 +427,49 @@ class Core_Orders
         'connection_error' => __('Connection error. Please try again.', 'woo-priority')
       ]);
     }
+  }
+
+  /**
+   * Display priority processing on order confirmation (thank you) page
+   * Shows a highlighted notice at the top
+   */
+  public function display_priority_on_thank_you($order_id)
+    if (!$order_id) {
+      return;
+    }
+
+    $order = wc_get_order($order_id);
+    if (!$order || $order->get_meta('_priority_processing') !== 'yes') {
+      return;
+    }
+
+    $fee_label = get_option('wpp_fee_label', 'Priority Processing & Express Shipping');
+
+    ?>
+    <div class="woocommerce-message wpp-priority-thank-you" style="background: #dcfce7; border-color: #22c55e; color: #166534; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+      <strong style="font-size: 16px; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 24px;">⚡</span>
+        <?php _e('Priority Processing Activated!', 'woo-priority'); ?>
+      </strong>
+      <p style="margin: 10px 0 0 32px; font-size: 14px;">
+        <?php printf(__('Your order includes %s. We\'ll process and ship your order as quickly as possible!', 'woo-priority'), '<strong>' . esc_html($fee_label) . '</strong>'); ?>
+      </p>
+    </div>
+    <?php
+  }
+
+  /**
+   * Display priority processing in backend shipping section
+   * Shows priority info right after shipping address in admin
+   */
+  public function display_priority_in_shipping_section($order)
+    if ($order->get_meta('_priority_processing') !== 'yes') {
+      return;
+    }
+    ?>
+    <p style="margin-top: 10px;">
+      ⚡ <strong><?php _e('Priority Processing Active', 'woo-priority'); ?></strong>
+    </p>
+    <?php
   }
 }

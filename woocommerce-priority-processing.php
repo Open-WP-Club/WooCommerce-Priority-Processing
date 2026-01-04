@@ -1,258 +1,386 @@
 <?php
-
 /**
  * Plugin Name: WooCommerce Priority Processing
  * Description: Add priority processing and express shipping option at checkout
- * Version: 1.4.0
+ * Version: 1.4.2
  * Author: OpenWPClub.com
  * Author URI: https://openwpclub.com
  * License: GPL v2 or later
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: woo-priority
- * Requires at least: 5.8
+ * Domain Path: /languages
+ * Requires at least: 6.4
  * Requires PHP: 7.4
- * WC requires at least: 5.0
- * WC tested up to: 8.5
+ * WC requires at least: 8.0
+ * WC tested up to: 9.5
+ * Requires Plugins: woocommerce
+ *
+ * @package WooCommerce_Priority_Processing
+ * @since 1.0.0
  */
 
-// Prevent direct access
-if (!defined('ABSPATH')) {
-  exit;
+declare(strict_types=1);
+
+// Prevent direct access.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
-// Define plugin constants
-define('WPP_VERSION', '1.4.0');
-define('WPP_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('WPP_PLUGIN_URL', plugin_dir_url(__FILE__));
+// Define plugin constants.
+define( 'WPP_VERSION', '1.4.2' );
+define( 'WPP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'WPP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'WPP_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
-// Declare HPOS compatibility
-add_action('before_woocommerce_init', function () {
-  if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
-    \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
-  }
-});
+// Declare HPOS and Block compatibility.
+add_action(
+	'before_woocommerce_init',
+	function () {
+		if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
+		}
+	}
+);
 
-class WooCommerce_Priority_Processing
-{
-  private static $instance = null;
+/**
+ * Main Plugin Class
+ *
+ * @since 1.0.0
+ */
+class WooCommerce_Priority_Processing {
 
-  public $admin_menu;
-  public $admin_settings;
-  public $admin_dashboard;
-  public $frontend_checkout;
-  public $frontend_ajax;
-  public $frontend_fees;
-  public $frontend_shipping;
-  public $core_orders;
-  public $core_statistics;
+	/**
+	 * Single instance of the class
+	 *
+	 * @var WooCommerce_Priority_Processing|null
+	 */
+	private static ?WooCommerce_Priority_Processing $instance = null;
 
-  public static function instance()
-  {
-    if (null === self::$instance) {
-      self::$instance = new self();
-    }
-    return self::$instance;
-  }
+	/**
+	 * Admin menu instance
+	 *
+	 * @var Admin_Menu|null
+	 */
+	public ?Admin_Menu $admin_menu = null;
 
-  public function __construct()
-  {
-    // Check if WooCommerce is active
-    if (!class_exists('WooCommerce')) {
-      add_action('admin_notices', [$this, 'woocommerce_missing_notice']);
-      return;
-    }
+	/**
+	 * Admin settings instance
+	 *
+	 * @var Admin_Settings|null
+	 */
+	public ?Admin_Settings $admin_settings = null;
 
-    // Include all required files first
-    $this->include_files();
+	/**
+	 * Admin dashboard instance
+	 *
+	 * @var Admin_Dashboard|null
+	 */
+	public ?Admin_Dashboard $admin_dashboard = null;
 
-    // Initialize plugin
-    $this->init();
-  }
+	/**
+	 * Frontend checkout instance
+	 *
+	 * @var Frontend_Checkout|null
+	 */
+	public ?Frontend_Checkout $frontend_checkout = null;
 
-  /**
-   * Include all required files
-   */
-  private function include_files()
-  {
-    // Include core files
-    require_once WPP_PLUGIN_DIR . 'includes/core/permissions.php';
-    require_once WPP_PLUGIN_DIR . 'includes/core/statistics.php';
-    require_once WPP_PLUGIN_DIR . 'includes/core/orders.php';
+	/**
+	 * Frontend AJAX instance
+	 *
+	 * @var Frontend_AJAX|null
+	 */
+	public ?Frontend_AJAX $frontend_ajax = null;
 
-    // Include admin files
-    require_once WPP_PLUGIN_DIR . 'includes/admin/menu.php';
-    require_once WPP_PLUGIN_DIR . 'includes/admin/settings.php';
-    require_once WPP_PLUGIN_DIR . 'includes/admin/dashboard.php';
+	/**
+	 * Frontend fees instance
+	 *
+	 * @var Frontend_Fees|null
+	 */
+	public ?Frontend_Fees $frontend_fees = null;
 
-    // Include frontend files
-    require_once WPP_PLUGIN_DIR . 'includes/frontend/checkout.php';
-    require_once WPP_PLUGIN_DIR . 'includes/frontend/ajax.php';
-    require_once WPP_PLUGIN_DIR . 'includes/frontend/fees.php';
-    require_once WPP_PLUGIN_DIR . 'includes/frontend/shipping.php';
-  }
+	/**
+	 * Frontend shipping instance
+	 *
+	 * @var Frontend_Shipping|null
+	 */
+	public ?Frontend_Shipping $frontend_shipping = null;
 
-  private function init()
-  {
-    // Initialize core components
-    $this->core_statistics = new Core_Statistics();
-    $this->core_orders = new Core_Orders();
+	/**
+	 * Frontend blocks integration instance
+	 *
+	 * @var Frontend_Blocks_Integration|null
+	 */
+	public ?Frontend_Blocks_Integration $frontend_blocks = null;
 
-    // Initialize admin components
-    $this->admin_menu = new Admin_Menu($this->core_statistics);
-    $this->admin_settings = new Admin_Settings();
-    $this->admin_dashboard = new Admin_Dashboard($this->core_statistics);
+	/**
+	 * Core orders instance
+	 *
+	 * @var Core_Orders|null
+	 */
+	public ?Core_Orders $core_orders = null;
 
-    // Initialize frontend components
-    $this->frontend_checkout = new Frontend_Checkout();
-    $this->frontend_ajax = new Frontend_Ajax();
-    $this->frontend_fees = new Frontend_Fees();
-    $this->frontend_shipping = new Frontend_Shipping();
+	/**
+	 * Core statistics instance
+	 *
+	 * @var Core_Statistics|null
+	 */
+	public ?Core_Statistics $core_statistics = null;
 
-    // Register settings and defaults
-    add_action('admin_init', [$this, 'register_default_settings']);
+	/**
+	 * Get singleton instance
+	 *
+	 * @since 1.0.0
+	 * @return WooCommerce_Priority_Processing
+	 */
+	public static function instance(): WooCommerce_Priority_Processing {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
 
-    // Add cleanup hooks
-    add_action('woocommerce_cart_emptied', [$this, 'clear_priority_session']);
-    add_action('wp_logout', [$this, 'clear_priority_session']);
+	/**
+	 * Constructor
+	 *
+	 * @since 1.0.0
+	 */
+	private function __construct() {
+		// Check if WooCommerce is active.
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			add_action( 'admin_notices', array( $this, 'woocommerce_missing_notice' ) );
+			return;
+		}
 
-    // Plugin lifecycle hooks
-    register_activation_hook(__FILE__, [$this, 'on_activation']);
-    register_deactivation_hook(__FILE__, [$this, 'on_deactivation']);
-  }
+		// Load plugin textdomain.
+		add_action( 'init', array( $this, 'load_textdomain' ) );
 
-  public function woocommerce_missing_notice()
-  {
-?>
-    <div class="notice notice-error">
-      <p><?php _e('WooCommerce Priority Processing requires WooCommerce to be installed and active.', 'woo-priority'); ?></p>
-    </div>
-<?php
-  }
+		// Include all required files.
+		$this->include_files();
 
-  public function register_default_settings()
-  {
-    // Set defaults if not set
-    if (get_option('wpp_fee_amount') === false) {
-      update_option('wpp_fee_amount', '5.00');
-    }
-    if (get_option('wpp_checkbox_label') === false) {
-      update_option('wpp_checkbox_label', __('Priority processing + Express shipping', 'woo-priority'));
-    }
-    if (get_option('wpp_description') === false) {
-      update_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
-    }
-    if (get_option('wpp_fee_label') === false) {
-      update_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
-    }
-    if (get_option('wpp_section_title') === false) {
-      update_option('wpp_section_title', __('Express Options', 'woo-priority'));
-    }
-    if (get_option('wpp_enabled') === false) {
-      update_option('wpp_enabled', '1');
-    }
-    if (get_option('wpp_allowed_user_roles') === false) {
-      update_option('wpp_allowed_user_roles', ['customer']);
-    }
-    if (get_option('wpp_allow_guests') === false) {
-      update_option('wpp_allow_guests', '1');
-    }
-  }
+		// Initialize plugin.
+		$this->init();
+	}
 
-  public function clear_priority_session()
-  {
-    if (WC()->session) {
-      WC()->session->set('priority_processing', false);
-      error_log('WPP: Priority session cleared by main class');
-    }
-  }
+	/**
+	 * Load plugin textdomain for translations
+	 *
+	 * @since 1.4.2
+	 * @return void
+	 */
+	public function load_textdomain(): void {
+		load_plugin_textdomain( 'woo-priority', false, dirname( WPP_PLUGIN_BASENAME ) . '/languages' );
+	}
 
-  /**
-   * Plugin activation
-   */
-  public function on_activation()
-  {
-    // Create default options
-    add_option('wpp_enabled', '0');
-    add_option('wpp_fee_amount', '5.00');
-    add_option('wpp_checkbox_label', __('Priority processing + Express shipping', 'woo-priority'));
-    add_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
-    add_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
-    add_option('wpp_section_title', __('Express Options', 'woo-priority'));
-    add_option('wpp_allowed_user_roles', ['customer']);
-    add_option('wpp_allow_guests', '1');
+	/**
+	 * Include all required files
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function include_files(): void {
+		// Include core files.
+		require_once WPP_PLUGIN_DIR . 'includes/core/permissions.php';
+		require_once WPP_PLUGIN_DIR . 'includes/core/statistics.php';
+		require_once WPP_PLUGIN_DIR . 'includes/core/orders.php';
 
-    // Optionally schedule daily statistics refresh
-    if ($this->core_statistics) {
-      $this->core_statistics->schedule_daily_refresh();
-    }
+		// Include admin files.
+		require_once WPP_PLUGIN_DIR . 'includes/admin/menu.php';
+		require_once WPP_PLUGIN_DIR . 'includes/admin/settings.php';
+		require_once WPP_PLUGIN_DIR . 'includes/admin/dashboard.php';
 
-    error_log('WPP: Plugin activated successfully');
-  }
+		// Include frontend files.
+		require_once WPP_PLUGIN_DIR . 'includes/frontend/checkout.php';
+		require_once WPP_PLUGIN_DIR . 'includes/frontend/ajax.php';
+		require_once WPP_PLUGIN_DIR . 'includes/frontend/fees.php';
+		require_once WPP_PLUGIN_DIR . 'includes/frontend/shipping.php';
+		require_once WPP_PLUGIN_DIR . 'includes/frontend/blocks-integration.php';
+	}
 
-  /**
-   * Plugin deactivation
-   */
-  public function on_deactivation()
-  {
-    // Clear any sessions
-    if (class_exists('WooCommerce') && WC()->session) {
-      WC()->session->set('priority_processing', false);
-    }
+	/**
+	 * Initialize plugin components
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function init(): void {
+		// Initialize core components.
+		$this->core_statistics = new Core_Statistics();
+		$this->core_orders     = new Core_Orders();
 
-    // Clear statistics cache
-    if ($this->core_statistics) {
-      $this->core_statistics->clear_cache();
-      $this->core_statistics->cleanup_scheduled_events();
-    }
+		// Initialize admin components.
+		$this->admin_menu      = new Admin_Menu( $this->core_statistics );
+		$this->admin_settings  = new Admin_Settings();
+		$this->admin_dashboard = new Admin_Dashboard( $this->core_statistics );
 
-    error_log('WPP: Plugin deactivated and cleaned up');
-  }
+		// Initialize frontend components.
+		$this->frontend_checkout = new Frontend_Checkout();
+		$this->frontend_ajax     = new Frontend_AJAX();
+		$this->frontend_fees     = new Frontend_Fees();
+		$this->frontend_shipping = new Frontend_Shipping();
+		$this->frontend_blocks   = new Frontend_Blocks_Integration();
 
-  /**
-   * Get statistics instance
-   */
-  public function get_statistics()
-  {
-    return $this->core_statistics;
-  }
+		// Register settings and defaults.
+		add_action( 'admin_init', array( $this, 'register_default_settings' ) );
 
-  /**
-   * Get admin menu instance
-   */
-  public function get_admin_menu()
-  {
-    return $this->admin_menu;
-  }
+		// Add cleanup hooks.
+		add_action( 'woocommerce_cart_emptied', array( $this, 'clear_priority_session' ) );
+		add_action( 'wp_logout', array( $this, 'clear_priority_session' ) );
+	}
 
-  /**
-   * Get orders instance
-   */
-  public function get_orders()
-  {
-    return $this->core_orders;
-  }
+	/**
+	 * Display admin notice when WooCommerce is not active
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public function woocommerce_missing_notice(): void {
+		?>
+		<div class="notice notice-error">
+			<p>
+				<?php
+				esc_html_e( 'WooCommerce Priority Processing requires WooCommerce to be installed and active.', 'woo-priority' );
+				?>
+			</p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Register default plugin settings
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public function register_default_settings(): void {
+		$defaults = array(
+			'wpp_fee_amount'         => '5.00',
+			'wpp_checkbox_label'     => __( 'Priority processing + Express shipping', 'woo-priority' ),
+			'wpp_description'        => __( 'Your order will be processed with priority and shipped via express delivery', 'woo-priority' ),
+			'wpp_fee_label'          => __( 'Priority Processing & Express Shipping', 'woo-priority' ),
+			'wpp_section_title'      => __( 'Express Options', 'woo-priority' ),
+			'wpp_enabled'            => '1',
+			'wpp_allowed_user_roles' => array( 'customer' ),
+			'wpp_allow_guests'       => '1',
+		);
+
+		foreach ( $defaults as $option_name => $default_value ) {
+			if ( false === get_option( $option_name ) ) {
+				update_option( $option_name, $default_value );
+			}
+		}
+	}
+
+	/**
+	 * Clear priority processing session
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public function clear_priority_session(): void {
+		if ( WC()->session ) {
+			WC()->session->set( 'priority_processing', false );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WPP: Priority session cleared by main class' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+		}
+	}
+
+	/**
+	 * Plugin activation handler
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public static function on_activation(): void {
+		// Create default options.
+		$defaults = array(
+			'wpp_enabled'            => '0',
+			'wpp_fee_amount'         => '5.00',
+			'wpp_checkbox_label'     => __( 'Priority processing + Express shipping', 'woo-priority' ),
+			'wpp_description'        => __( 'Your order will be processed with priority and shipped via express delivery', 'woo-priority' ),
+			'wpp_fee_label'          => __( 'Priority Processing & Express Shipping', 'woo-priority' ),
+			'wpp_section_title'      => __( 'Express Options', 'woo-priority' ),
+			'wpp_allowed_user_roles' => array( 'customer' ),
+			'wpp_allow_guests'       => '1',
+		);
+
+		foreach ( $defaults as $option_name => $default_value ) {
+			add_option( $option_name, $default_value );
+		}
+
+		// Initialize statistics scheduling on activation, if available.
+		if ( class_exists( 'Core_Statistics' ) ) {
+			$statistics = new Core_Statistics();
+			if ( method_exists( $statistics, 'schedule_daily_refresh' ) ) {
+				$statistics->schedule_daily_refresh();
+			}
+		}
+	}
+
+	/**
+	 * Plugin deactivation handler
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public static function on_deactivation(): void {
+		// Clear any sessions.
+		if ( class_exists( 'WooCommerce' ) && WC()->session ) {
+			WC()->session->set( 'priority_processing', false );
+		}
+
+		// Clear statistics cache if available.
+		if ( class_exists( 'Core_Statistics' ) ) {
+			$statistics = new Core_Statistics();
+			if ( method_exists( $statistics, 'clear_cache' ) ) {
+				$statistics->clear_cache();
+			}
+			if ( method_exists( $statistics, 'cleanup_scheduled_events' ) ) {
+				$statistics->cleanup_scheduled_events();
+			}
+		}
+	}
+
+	/**
+	 * Get statistics instance
+	 *
+	 * @since 1.0.0
+	 * @return Core_Statistics|null
+	 */
+	public function get_statistics(): ?Core_Statistics {
+		return $this->core_statistics;
+	}
+
+	/**
+	 * Get admin menu instance
+	 *
+	 * @since 1.0.0
+	 * @return Admin_Menu|null
+	 */
+	public function get_admin_menu(): ?Admin_Menu {
+		return $this->admin_menu;
+	}
+
+	/**
+	 * Get orders instance
+	 *
+	 * @since 1.0.0
+	 * @return Core_Orders|null
+	 */
+	public function get_orders(): ?Core_Orders {
+		return $this->core_orders;
+	}
 }
 
-// Initialize plugin
-add_action('plugins_loaded', function () {
-  WooCommerce_Priority_Processing::instance();
-});
+// Initialize plugin after all plugins are loaded.
+add_action(
+	'plugins_loaded',
+	function () {
+		WooCommerce_Priority_Processing::instance();
+	}
+);
 
-// Legacy activation/deactivation hooks (for backward compatibility)
-register_activation_hook(__FILE__, function () {
-  // Create default options
-  add_option('wpp_enabled', '0');
-  add_option('wpp_fee_amount', '5.00');
-  add_option('wpp_checkbox_label', __('Priority processing + Express shipping', 'woo-priority'));
-  add_option('wpp_description', __('Your order will be processed with priority and shipped via express delivery', 'woo-priority'));
-  add_option('wpp_fee_label', __('Priority Processing & Express Shipping', 'woo-priority'));
-  add_option('wpp_section_title', __('Express Options', 'woo-priority'));
-  add_option('wpp_allowed_user_roles', ['customer']);
-  add_option('wpp_allow_guests', '1');
-});
-
-register_deactivation_hook(__FILE__, function () {
-  // Clear any sessions
-  if (class_exists('WooCommerce') && WC()->session) {
-    WC()->session->set('priority_processing', false);
-  }
-});
+// Register activation and deactivation hooks.
+register_activation_hook( __FILE__, array( 'WooCommerce_Priority_Processing', 'on_activation' ) );
+register_deactivation_hook( __FILE__, array( 'WooCommerce_Priority_Processing', 'on_deactivation' ) );
