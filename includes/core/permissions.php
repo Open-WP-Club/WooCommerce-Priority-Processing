@@ -64,6 +64,7 @@ class Core_Permissions {
    * @return bool
    */
   public static function user_can_access($user_id)
+  {
     if (empty($user_id)) {
       return self::can_access_priority_processing();
     }
