@@ -90,7 +90,7 @@ class Admin_Menu
     if (class_exists('WC_Settings_Page') && !get_transient('wpp_wc_integration_attempted')) {
       add_filter('woocommerce_get_settings_pages', [$this, 'add_woocommerce_settings_page']);
       set_transient('wpp_wc_integration_attempted', true, HOUR_IN_SECONDS);
-      error_log('WPP: WooCommerce settings integration attempted');
+      wpp_log( 'WooCommerce settings integration attempted' );
     }
   }
 
@@ -109,7 +109,7 @@ class Admin_Menu
 
     if (class_exists('WC_Settings_Priority_Processing')) {
       $settings[] = new WC_Settings_Priority_Processing();
-      error_log('WPP: Added WooCommerce settings page');
+      wpp_log( 'Added WooCommerce settings page' );
     }
 
     return $settings;

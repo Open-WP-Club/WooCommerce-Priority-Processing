@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Priority Processing
  * Description: Add priority processing and express shipping option at checkout
- * Version: 1.4.3
+ * Version: 1.4.4
  * Author: OpenWPClub.com
  * Author URI: https://openwpclub.com
  * License: GPL v2 or later
@@ -27,10 +27,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants.
-define( 'WPP_VERSION', '1.4.3' );
+define( 'WPP_VERSION', '1.4.4' );
 define( 'WPP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPP_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+
+/**
+ * Log message only when WP_DEBUG_LOG is enabled
+ *
+ * @since 1.4.4
+ * @param string $message Message to log.
+ * @return void
+ */
+function wpp_log( string $message ): void {
+	if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+		error_log( 'WPP: ' . $message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+	}
+}
 
 // Declare HPOS and Block compatibility.
 add_action(
@@ -278,11 +291,9 @@ class WooCommerce_Priority_Processing {
 	 * @return void
 	 */
 	public function clear_priority_session(): void {
-		if ( WC()->session ) {
+		if ( WC()->session && WC()->session->get( 'priority_processing' ) ) {
 			WC()->session->set( 'priority_processing', false );
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( 'WPP: Priority session cleared by main class' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			}
+			wpp_log( 'Priority session cleared by main class' );
 		}
 	}
 

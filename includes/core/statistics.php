@@ -26,18 +26,18 @@ class Core_Statistics
     if (!$force_refresh) {
       $cached_stats = get_transient($this->cache_key);
       if ($cached_stats !== false) {
-        error_log('WPP: Statistics loaded from cache');
+        wpp_log( 'Statistics loaded from cache' );
         return $cached_stats;
       }
     }
 
     // Calculate fresh statistics
-    error_log('WPP: Calculating fresh statistics...');
+    wpp_log( 'Calculating fresh statistics...' );
     $stats = $this->calculate_statistics();
 
     // Cache the results for 24 hours
     set_transient($this->cache_key, $stats, $this->cache_duration);
-    error_log('WPP: Statistics cached for 24 hours');
+    wpp_log( 'Statistics cached for 24 hours' );
 
     return $stats;
   }
@@ -73,7 +73,7 @@ class Core_Statistics
     // Calculate revenue from priority fees
     $stats = $this->calculate_priority_revenue($stats);
 
-    error_log('WPP: Statistics calculation completed - Total Priority Orders: ' . $stats['total_priority_orders']);
+    wpp_log( 'Statistics calculation completed - Total Priority Orders: ' . $stats['total_priority_orders'] );
 
     return $stats;
   }
@@ -275,9 +275,9 @@ class Core_Statistics
           }
         }
 
-        error_log('WPP: Processed ' . count($priority_orders) . ' priority orders for revenue calculation');
+        wpp_log( 'Processed ' . count($priority_orders) . ' priority orders for revenue calculation' );
       } catch (Exception $e) {
-        error_log('WPP: Error calculating priority revenue: ' . $e->getMessage());
+        wpp_log( 'Error calculating priority revenue: ' . $e->getMessage() );
       }
     }
 
@@ -303,7 +303,7 @@ class Core_Statistics
   public function clear_cache()
   {
     delete_transient($this->cache_key);
-    error_log('WPP: Statistics cache cleared manually');
+    wpp_log( 'Statistics cache cleared manually' );
   }
 
   /**
@@ -352,7 +352,7 @@ class Core_Statistics
       // Update last updated time to current time
       $formatted['last_updated'] = gmdate('H:i');
 
-      error_log('WPP: Statistics refreshed via AJAX');
+      wpp_log( 'Statistics refreshed via AJAX' );
 
       // Return updated stats with formatted values
       wp_send_json_success([
@@ -361,7 +361,7 @@ class Core_Statistics
         'message' => __('Statistics updated successfully', 'woo-priority')
       ]);
     } catch (Exception $e) {
-      error_log('WPP: Error refreshing statistics: ' . $e->getMessage());
+      wpp_log( 'Error refreshing statistics: ' . $e->getMessage() );
       wp_send_json_error('Error refreshing statistics: ' . $e->getMessage());
     }
   }
@@ -397,7 +397,7 @@ class Core_Statistics
    */
   public function daily_cache_refresh()
   {
-    error_log('WPP: Running daily statistics cache refresh');
+    wpp_log( 'Running daily statistics cache refresh' );
     $this->get_statistics(true);
   }
 

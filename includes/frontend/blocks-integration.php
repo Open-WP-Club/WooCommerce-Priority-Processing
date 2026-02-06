@@ -273,8 +273,8 @@ class Frontend_Blocks_Integration {
 	 * @return void
 	 */
 	private function log_debug( string $message ): void {
-		if ( ( defined( 'WP_DEBUG' ) && WP_DEBUG ) || ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) ) {
-			error_log( $message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-		}
+		// Remove WPP prefix if present since wpp_log() adds it.
+		$message = preg_replace( '/^WPP\s*(Blocks)?:\s*/i', '', $message );
+		wpp_log( $message );
 	}
 }

@@ -330,7 +330,7 @@ class Core_Orders {
           $fee->set_order_id($order_id);
           $order->add_item($fee);
 
-          error_log("WPP: Added priority fee of {$fee_amount} to order #{$order_id}");
+          wpp_log( "Added priority fee of {$fee_amount} to order #{$order_id}" );
         }
 
         // Add order note
@@ -392,7 +392,7 @@ class Core_Orders {
         $wpp_instance->get_statistics()->clear_cache();
       }
 
-      error_log("WPP: Priority processing {$action}ed for order #{$order_id} by user {$current_user->display_name}");
+      wpp_log( "Priority processing {$action}ed for order #{$order_id} by user {$current_user->display_name}" );
 
       wp_send_json_success([
         'message' => $message,
@@ -402,7 +402,7 @@ class Core_Orders {
         'has_priority' => ($action === 'add')
       ]);
     } catch (Exception $e) {
-      error_log('WPP Order Priority Toggle Error: ' . $e->getMessage());
+      wpp_log( 'Order Priority Toggle Error: ' . $e->getMessage() );
       wp_send_json_error(__('An error occurred while updating the order', 'woo-priority'));
     }
   }
