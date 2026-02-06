@@ -133,7 +133,7 @@ class Frontend_Checkout {
     wp_enqueue_style(
       'wpp-frontend',
       WPP_PLUGIN_URL . 'assets/css/frontend.css',
-      ['woocommerce-general'],
+      [],
       WPP_VERSION
     );
 

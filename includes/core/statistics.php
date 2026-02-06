@@ -98,23 +98,25 @@ class Core_Statistics
     $order_meta_table = $wpdb->prefix . 'wc_orders_meta';
 
     // Total priority orders
-    $total_priority = $wpdb->get_var($wpdb->prepare("
-      SELECT COUNT(DISTINCT o.id) 
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are safe.
+    $total_priority = $wpdb->get_var( "
+      SELECT COUNT(DISTINCT o.id)
       FROM {$orders_table} o
       INNER JOIN {$order_meta_table} om ON o.id = om.order_id
-      WHERE om.meta_key = '_priority_processing' 
+      WHERE om.meta_key = '_priority_processing'
       AND om.meta_value = 'yes'
       AND o.type = 'shop_order'
       AND o.status NOT IN ('trash', 'auto-draft')
-    "));
+    " );
 
     // Total orders for percentage calculation
-    $total_orders = $wpdb->get_var($wpdb->prepare("
-      SELECT COUNT(*) 
-      FROM {$orders_table} 
-      WHERE type = 'shop_order' 
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are safe.
+    $total_orders = $wpdb->get_var( "
+      SELECT COUNT(*)
+      FROM {$orders_table}
+      WHERE type = 'shop_order'
       AND status NOT IN ('trash', 'auto-draft')
-    "));
+    " );
 
     // Today's priority orders
     $today = gmdate('Y-m-d');
@@ -173,23 +175,25 @@ class Core_Statistics
     $postmeta_table = $wpdb->postmeta;
 
     // Total priority orders
-    $total_priority = $wpdb->get_var($wpdb->prepare("
-      SELECT COUNT(DISTINCT p.ID) 
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are safe.
+    $total_priority = $wpdb->get_var( "
+      SELECT COUNT(DISTINCT p.ID)
       FROM {$posts_table} p
       INNER JOIN {$postmeta_table} pm ON p.ID = pm.post_id
-      WHERE pm.meta_key = '_priority_processing' 
+      WHERE pm.meta_key = '_priority_processing'
       AND pm.meta_value = 'yes'
       AND p.post_type = 'shop_order'
       AND p.post_status NOT IN ('trash', 'auto-draft')
-    "));
+    " );
 
     // Total orders
-    $total_orders = $wpdb->get_var($wpdb->prepare("
-      SELECT COUNT(*) 
-      FROM {$posts_table} 
-      WHERE post_type = 'shop_order' 
+    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are safe.
+    $total_orders = $wpdb->get_var( "
+      SELECT COUNT(*)
+      FROM {$posts_table}
+      WHERE post_type = 'shop_order'
       AND post_status NOT IN ('trash', 'auto-draft')
-    "));
+    " );
 
     // Today's priority orders
     $today = gmdate('Y-m-d');
